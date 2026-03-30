@@ -1,14 +1,32 @@
-#ifndef DATA_REGISTER_H
-    #define DATA_REGISTER_H
+#ifndef Record_H
+    #define Record_H
     #include <stdio.h>
     #include <stdlib.h>
 
-    typedef struct dataRegister DATA_REGISTER;
+    typedef struct dataRegister Record;
 
-    DATA_REGISTER *CreateDataRegister(int codEstacao, int codLinha, int codProxEstacao, int distProxEstacao, int codEstIntegra, int codLinhaIntegra, int tamNomeEstacao, int tamNomeLinha);
-    int GetNomeEstacao(DATA_REGISTER *dRegister);
-    int GetCodEstacao(DATA_REGISTER *dRegister);
-    int GetCodProxEstacao(DATA_REGISTER *dRegister);
-    void FreeDataRegister(DATA_REGISTER **dRegister);
+    Record *CreateRecord();
+    void FreeRecord(Record *r);
 
+    // setters
+    void record_set_removido(Record *r, char removido);
+    void record_set_proximo(Record *r, int proximo);
+
+    void record_set_codEstacao(Record *r, int cod);
+    void record_set_codLinha(Record *r, int cod);
+    void record_set_codProxEstacao(Record *r, int cod);
+    void record_set_distProxEstacao(Record *r, int dist);
+    void record_set_codLinhaIntegra(Record *r, int cod);
+    void record_set_codEstIntegra(Record *r, int cod);
+
+    // Setters para campos de tamanho variável
+    void record_set_nomeEstacao(Record *r, char *nome);
+    void record_set_nomeLinha(Record *r, char *nome);
+
+    int GetNomeEstacao(Record *r);
+    int GetCodEstacao(Record *r);
+    int GetCodProxEstacao(Record *r);
+
+    // Escrita campo a campo com preenchimento de lixo ($)
+    void record_write_to_file(FILE *fp, Record *r);
 #endif
