@@ -119,16 +119,16 @@ void record_set_nomeLinha(Record *r, char *nome) {
     }
 }
 
-int GetNomeEstacao(Record *dRegister){
-    return dRegister->nomeEstacao;
+char* GetNomeEstacao(Record *r){
+    return r->nomeEstacao;
 }
 
-int GetCodEstacao(Record *dRegister){
-    return dRegister->codEstacao;
+int GetCodEstacao(Record *r){
+    return r->codEstacao;
 }
 
-int GetCodProxEstacao(Record *dRegister){
-    return dRegister->codProxEstacao;
+int GetCodProxEstacao(Record *r){
+    return r->codProxEstacao;
 }
 
 void record_write_to_file(FILE *fp, Record *r) {
@@ -149,8 +149,8 @@ void record_write_to_file(FILE *fp, Record *r) {
     fwrite(&r->tamNomeLinha, sizeof(int), 1, fp);
     if(r->tamNomeLinha > 0) fwrite(r->nomeLinha, 1, r->tamNomeLinha, fp);
 
-    // Preenchimento com lixo '$' até completar 80 bytes [cite: 114, 115]
-    int ocupado = 34 + r->tamNomeEstacao + r->tamNomeLinha;
+    // Preenchimento com lixo '$' até completar 80 bytes 
+    int ocupado = 37 + r->tamNomeEstacao + r->tamNomeLinha;
     char lixo = '$';
     for(int i = ocupado; i < 80; i++) {
         fwrite(&lixo, sizeof(char), 1, fp);

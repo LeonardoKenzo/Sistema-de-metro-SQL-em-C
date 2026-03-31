@@ -24,6 +24,10 @@ Header *CreateHeaderRegister(){
     return hRegister;
 }
 
+void header_set_status(Header *h, char status){
+    h->status = status;
+}
+
 void header_write_to_file(FILE *fp, Header *h){
     fwrite(&h->status, sizeof(char), 1, fp);
     fwrite(&h->topo, sizeof(int), 1, fp);
