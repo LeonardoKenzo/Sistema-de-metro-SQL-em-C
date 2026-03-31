@@ -23,7 +23,7 @@
     void record_set_nomeEstacao(Record *r, char *nome);
     void record_set_nomeLinha(Record *r, char *nome);
 
-    int GetNomeEstacao(Record *r);
+    char* GetNomeEstacao(Record *r);
     int GetCodEstacao(Record *r);
     int GetCodProxEstacao(Record *r);
 
