@@ -29,7 +29,10 @@ int main(void){
         break;
     }
     case 3:{
-        // funcionalidade 3
+        char arq_bin[100];
+        scanf("%s", arq_bin);
+        search_table(arq_bin);
+
         break;
     }
     case 4:{

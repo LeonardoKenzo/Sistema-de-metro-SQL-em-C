@@ -13,6 +13,12 @@ typedef struct PARES_ESTACOES
     int proxCodEstacao;
 }paresEstacoes;
 
+// Estrutura auxiliar para armazenar os critérios de busca
+typedef struct {
+    char nomeCampo[50];
+    char valorCampo[100];
+} Criterio;
+
 char* get_field(char **line);
 
 char **criar_lista_nomesEstacoes(int nroMaxEstacoes);
@@ -22,9 +28,14 @@ void free_lista_paresEstacoes(paresEstacoes **lista);
 
 int ler_campoFixo(FILE *bin, int posRecord, int posOffset);
 char *ler_campoVariavel(FILE *bin, int posRecord, int posOffset);
+void printar_record_object(Record *r);
 void printar_record(FILE *bin, int posRecord);
 bool status_esta_instavel(FILE *bin);
 bool esta_removido(FILE *bin, int posRecord);
+
+// Função para verificar se um registro atende aos critérios
+bool atende_criterios(Record *r, Criterio *criterios, int m);
+void ScanQuoteString(char *str);
 
 // Funcionalidade 1 ------------------------------------------
 void create_table(char *csv_filename, char *bin_filename){
@@ -181,7 +192,53 @@ void print_table(char *bin_filename){
 }
 
 // Funcionalidade 3 ------------------------------------
+void search_table(char *bin_filename){
+    FILE *bin = fopen(bin_filename, "rb");
+    if(!bin || status_esta_instavel(bin)){
+        printf("Falha no processamento do arquivo.\n");
+        if (bin) fclose(bin);
+        return;
+    }
 
+    int n;
+    scanf(" %d", &n);
+
+    for(int i = 0; i < n; i++){
+        int m;
+        scanf(" %d", &m);
+        Criterio *criterios = malloc(sizeof(Criterio) * m);
+        
+        for(int j = 0; j < m; j++){
+            scanf("%s", criterios[j].nomeCampo);
+            // scan_quote_string lida com aspas em strings
+            ScanQuoteString(criterios[j].valorCampo); 
+        }
+
+        printf("Busca %d\n", i+1);
+        fseek(bin, 17, SEEK_SET);
+
+        bool encontrado = false;
+        Record *r;
+
+        while((r = record_read_from_file(bin)) != NULL){
+            if (record_get_removido(r) == "1"){
+                free_record(&r);
+                continue;
+            }
+
+            if(atende_criterios(r, criterios, m)){
+                printar_record_object(r);
+                encontrado=true;
+            }
+            free_record(&r);
+        }
+        if(!encontrado){
+            printf("Registro inexistente.\n");
+        }
+        free(criterios);
+    }
+    fclose(bin);
+}
 
 
 /*
@@ -289,51 +346,72 @@ bool esta_removido(FILE *bin, int posRecord){
     return false;
 }
 
-void print_auxiliar_record(int codigo){
-    if(codigo == -1)
-        printf("NULO ");
-    else
-        printf("%d ", codigo);
+// Auxiliar para imprimir inteiros tratando o valor -1 como NULO
+void print_int_or_nulo(int valor) {
+    if (valor == -1) {
+        printf("NULO");
+    } else {
+        printf("%d", valor);
+    }
+}
+
+// Auxiliar para imprimir strings tratando o ponteiro NULL como NULO
+void print_str_or_nulo(char *str) {
+    if (str == NULL || strlen(str) == 0) {
+        printf("NULO");
+    } else {
+        printf("%s", str);
+    }
+}
+
+void printar_record_object(Record *r) {
+    if (r == NULL) return;
+
+    // codEstacao (Nunca é nulo conforme especificação)
+    printf("%d ", record_get_codEstacao(r));
+
+    // nomeEstacao (Nunca é nulo conforme especificação)
+    printf("%s ", record_get_nomeEstacao(r));
+
+    // codLinha
+    print_int_or_nulo(record_get_codLinha(r));
+    printf(" ");
+
+    // 4. nomeLinha
+    print_str_or_nulo(record_get_nomeLinha(r));
+    printf(" ");
+
+    // codProxEstacao
+    print_int_or_nulo(record_get_codProxEstacao(r));
+    printf(" ");
+
+    // distProxEstacao
+    print_int_or_nulo(record_get_distProxEstacao(r));
+    printf(" ");
+
+    // codLinhaIntegra
+    print_int_or_nulo(record_get_codLinhaIntegra(r));
+    printf(" ");
+
+    // codEstIntegra
+    print_int_or_nulo(record_get_codEstIntegra(r));
+
+    // Quebra de linha final para o registro
+    printf("\n");
 }
 
 void printar_record(FILE *bin, int posRecord){
-    if(esta_removido(bin, posRecord))
-        return;
+    fseek(bin, posRecord, SEEK_SET);
     
-    int posCodEst = 5, posNomeEst = 29, posCodLinha = 9, posCodProxEst = 13, posDistEst = 17, posCodLinhaInt = 21, posCodEstInt = 25;  
+    // Em vez de dar printf campo a campo
+    Record *r = record_read_from_file(bin); // Lê e cria o objeto
     
-    int codEst = ler_campoFixo(bin, posRecord, posCodEst);
-    char *nomeEst = ler_campoVariavel(bin, posRecord, posNomeEst);
-    
-    printf("%d %s ", codEst, nomeEst);
-
-    // Calcular o posNomeLinha (sempre vai ter nomeEst)
-    int tamanhoEst = strlen(nomeEst);
-    int posNomeLinha = posNomeEst + tamanhoEst + 4;
-    
-    int codLinha = ler_campoFixo(bin, posRecord, posCodLinha);
-    char *nomeLinha = ler_campoVariavel(bin, posRecord, posNomeLinha);
-
-    print_auxiliar_record(codLinha);
-    if(nomeLinha)
-        printf("%s ", nomeLinha);
-    else
-        printf("NULO ");
-
-    int codProxEst = ler_campoFixo(bin, posRecord, posCodProxEst);
-    int distExt = ler_campoFixo(bin, posRecord, posDistEst);
-    int codLinhaInt = ler_campoFixo(bin, posRecord, posCodLinhaInt);
-    int codEstInt = ler_campoFixo(bin, posRecord, posCodEstInt);
-
-    print_auxiliar_record(codProxEst);
-    print_auxiliar_record(distExt);
-    print_auxiliar_record(codLinhaInt);
-    print_auxiliar_record(codEstInt);
-    printf("\b\n");
-
-    free(nomeEst);
-    free(nomeLinha);
+    if (r != NULL) {
+        printar_record_object(r); // Usa a lógica centralizada de exibição
+        free_record(&r);        
+    }
 }
+
 
 // Funcoes auxiliares para verificar nroEstacoes e paresEstacoes
 char **criar_lista_nomesEstacoes(int nroMaxEstacoes){
@@ -369,4 +447,75 @@ paresEstacoes *criar_lista_paresEstacoes(int nroMaxPares){
 void free_lista_paresEstacoes(paresEstacoes **lista){
     free((*lista));
     *lista = NULL;
+}
+
+
+bool atende_criterios(Record *r, Criterio *criterios, int m){
+    for(int i = 0; i < m; i++){
+        if (strncmp(criterios[i].nomeCampo, "codEstacao", 10) == 0) {
+            if (record_get_codEstacao(r) != atoi(criterios[i].valorCampo)) 
+                return false;
+        } 
+        else if (strncmp(criterios[i].nomeCampo, "codLinha", 8) == 0) {
+            if (record_get_codLinha(r) != atoi(criterios[i].valorCampo)) 
+                return false;
+        } 
+        else if (strncmp(criterios[i].nomeCampo, "codProxEstacao", 14) == 0) {
+            int val = (strcmp(criterios[i].valorCampo, "NULO") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            if (record_get_codProxEstacao(r) != val) 
+                return false;
+        } 
+        else if (strncmp(criterios[i].nomeCampo, "distProxEstacao", 15) == 0) {
+            int val = (strcmp(criterios[i].valorCampo, "NULO") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            if (record_get_distProxEstacao(r) != val) 
+                return false;
+        } 
+        else if (strncmp(criterios[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
+            int val = (strcmp(criterios[i].valorCampo, "NULO") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            if (record_get_codLinhaIntegra(r) != val) 
+                return false;
+        } 
+        else if (strncmp(criterios[i].nomeCampo, "codEstIntegra", 13) == 0) {
+            int val = (strcmp(criterios[i].valorCampo, "NULO") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            if (record_get_codEstIntegra(r) != val) 
+                return false;
+        } 
+        else if (strncmp(criterios[i].nomeCampo, "nomeEstacao", 11) == 0) {
+            char *nome = record_get_nomeEstacao(r);
+            if (nome == NULL || strcmp(nome, criterios[i].valorCampo) != 0) 
+                return false;
+        } 
+        else if (strncmp(criterios[i].nomeCampo, "nomeLinha", 9) == 0) {
+            char *nome = record_get_nomeLinha(r);
+            if (nome == NULL || strcmp(nome, criterios[i].valorCampo) != 0)     
+                return false;
+        }
+    }
+    return true;
+}
+
+void ScanQuoteString(char *str) {
+    char R;
+
+    while ((R = getchar()) != EOF && isspace(R))
+        ; // ignorar espaços, \r, \n...
+
+    if (R == 'N' || R == 'n') { // campo NULO
+        getchar();
+        getchar();
+        getchar();       // ignorar o "ULO" de NULO.
+        strcpy(str, ""); // copia string vazia
+    } else if (R == '\"') {
+        if (scanf("%[^\"]", str) != 1) { // ler até o fechamento das aspas
+            strcpy(str, "");
+        }
+        getchar();         // ignorar aspas fechando
+    } else if (R != EOF) { // vc tá tentando ler uma string que não tá entre
+                           // aspas! Fazer leitura normal %s então, pois deve
+                           // ser algum inteiro ou algo assim...
+        str[0] = R;
+        scanf("%s", &str[1]);
+    } else { // EOF
+        strcpy(str, "");
+    }
 }

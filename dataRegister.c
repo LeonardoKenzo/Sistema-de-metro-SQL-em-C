@@ -120,6 +120,10 @@ void record_set_nomeLinha(Record *r, char *nome) {
 }
 
 // Getters
+char record_get_removido(Record *r){
+    if (r == NULL) return '1'; // Se o registro for nulo, tratamos como inválido/removido
+    return r->removido;    
+}
 
 int record_get_codEstacao(Record *r) { 
     return r ? r->codEstacao : -1; 
@@ -156,7 +160,7 @@ char* record_get_nomeLinha(Record *r) {
 Record* record_read_from_file(FILE *fp){
     Record *r = create_record();
     if(fread(&r->removido, sizeof(char), 1, fp) != 1){
-        free(&r);
+        free(r);
         return NULL;
     }
     fread(&r->proximo, sizeof(int), 1, fp);
@@ -186,6 +190,7 @@ Record* record_read_from_file(FILE *fp){
 
     return r;
 }
+
 void record_write_to_file(FILE *fp, Record *r) {
     // Escrita dos campos fixos
     fwrite(&r->removido, sizeof(char), 1, fp);
