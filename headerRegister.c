@@ -8,7 +8,7 @@ struct headerRegister{
     int nroParesEstacoes;
 };
 
-Header *CreateHeaderRegister(){
+Header *create_header_register(){
     Header *hRegister = (Header *)calloc(1, sizeof(Header));
     if(!hRegister){
         printf("Erro: alocar memória (Header Register)!\n");
@@ -28,6 +28,22 @@ void header_set_status(Header *h, char status){
     h->status = status;
 }
 
+void header_set_topo(Header *h, int topo){
+    h->topo = topo;
+}
+
+void header_set_proxRRN(Header *h, int proxRRN){
+    h->proxRRN = proxRRN;
+}
+
+void header_set_nroEstacoes(Header *h, int nroEstacoes){
+    h->nroEstacoes = nroEstacoes;
+}
+
+void header_set_nroParesEst(Header *h, int nroParesEst){
+    h->nroParesEstacoes = nroParesEst;
+}
+
 void header_write_to_file(FILE *fp, Header *h){
     fwrite(&h->status, sizeof(char), 1, fp);
     fwrite(&h->topo, sizeof(int), 1, fp);
@@ -36,7 +52,7 @@ void header_write_to_file(FILE *fp, Header *h){
     fwrite(&h->nroParesEstacoes, sizeof(int), 1, fp);
 }
 
-void FreeHeaderRegister(Header **hRegister){
+void free_header_register(Header **hRegister){
     free((*hRegister));
     (*hRegister) = NULL;
 }

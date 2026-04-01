@@ -5,6 +5,7 @@
 #include "dataRegister.h"
 #include "functionalities.h"
 
+
 int main(void){
     
     int funcionalidade;
@@ -12,25 +13,37 @@ int main(void){
 
     switch (funcionalidade)
     {
-    case 1:
-        // funcionalidade 1
+    case 1:{   
+        // funcionalidade 1 (CREATE TABLE)
+        char arq_csv[100], arq_bin[100];
+        scanf(" %s %s", arq_csv, arq_bin);
+        create_table(arq_csv, arq_bin);
+        BinarioNaTela(arq_bin);
         break;
-    case 2:
+    }
+    case 2:{    
         // funcionalidade 2
+        char arq_bin[100];
+        scanf(" %s", arq_bin);
+        print_table(arq_bin);
         break;
-    case 3:
+    }
+    case 3:{
         // funcionalidade 3
         break;
-    case 4:
+    }
+    case 4:{
         // funcionalidade 4
         break;
-    case 5:
+    }
+    case 5:{
         // funcionalidade 5
         break;
-    case 6:
+    }
+    case 6:{
         // funcionalidade 6
         break;
     }
-
+    }
     return 0;
 }
