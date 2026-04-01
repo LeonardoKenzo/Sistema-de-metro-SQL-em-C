@@ -15,7 +15,7 @@ struct dataRegister{
     char *nomeLinha;
 };
 
-Record *CreateRecord() {
+Record *create_record() {
     Record *r = (Record*) malloc(sizeof(Record));
     if (r == NULL) {
         return NULL;
@@ -119,18 +119,6 @@ void record_set_nomeLinha(Record *r, char *nome) {
     }
 }
 
-char* GetNomeEstacao(Record *r){
-    return r->nomeEstacao;
-}
-
-int GetCodEstacao(Record *r){
-    return r->codEstacao;
-}
-
-int GetCodProxEstacao(Record *r){
-    return r->codProxEstacao;
-}
-
 void record_write_to_file(FILE *fp, Record *r) {
     // Escrita dos campos fixos
     fwrite(&r->removido, sizeof(char), 1, fp);
@@ -157,18 +145,19 @@ void record_write_to_file(FILE *fp, Record *r) {
     }
 }
 
-void FreeRecord(Record *r) {
-    if (r == NULL) {
+void free_record(Record **r) {
+    if (*r == NULL) {
         return;
     }
 
-    if (r->nomeEstacao != NULL) {
-        free(r->nomeEstacao);
+    if ((*r)->nomeEstacao != NULL) {
+        free((*r)->nomeEstacao);
     }
     
-    if (r->nomeLinha != NULL) {
-        free(r->nomeLinha);
+    if ((*r)->nomeLinha != NULL) {
+        free((*r)->nomeLinha);
     }
 
-    free(r);
+    free(*r);
+    *r = NULL;
 }

@@ -2,13 +2,14 @@
     #define Record_H
     #include <stdio.h>
     #include <stdlib.h>
+    #include <string.h>
 
     typedef struct dataRegister Record;
 
-    Record *CreateRecord();
-    void FreeRecord(Record *r);
+    Record *create_record();
+    void free_record(Record **r);
 
-    // setters
+    // Setters
     void record_set_removido(Record *r, char removido);
     void record_set_proximo(Record *r, int proximo);
 
@@ -23,10 +24,7 @@
     void record_set_nomeEstacao(Record *r, char *nome);
     void record_set_nomeLinha(Record *r, char *nome);
 
-    char* GetNomeEstacao(Record *r);
-    int GetCodEstacao(Record *r);
-    int GetCodProxEstacao(Record *r);
-
     // Escrita campo a campo com preenchimento de lixo ($)
     void record_write_to_file(FILE *fp, Record *r);
+    
 #endif
