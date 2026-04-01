@@ -15,7 +15,7 @@ struct dataRegister{
     char *nomeLinha;
 };
 
-Record *CreateRecord() {
+Record *create_record() {
     Record *r = (Record*) malloc(sizeof(Record));
     if (r == NULL) {
         return NULL;
@@ -119,18 +119,73 @@ void record_set_nomeLinha(Record *r, char *nome) {
     }
 }
 
-char* GetNomeEstacao(Record *r){
-    return r->nomeEstacao;
+// Getters
+
+int record_get_codEstacao(Record *r) { 
+    return r ? r->codEstacao : -1; 
 }
 
-int GetCodEstacao(Record *r){
-    return r->codEstacao;
+int record_get_codLinha(Record *r) { 
+    return r ? r->codLinha : -1; 
 }
 
-int GetCodProxEstacao(Record *r){
-    return r->codProxEstacao;
+int record_get_codProxEstacao(Record *r) { 
+    return r ? r->codProxEstacao : -1; 
 }
 
+int record_get_distProxEstacao(Record *r) { 
+    return r ? r->distProxEstacao : -1; 
+}
+
+int record_get_codLinhaIntegra(Record *r) { 
+    return r ? r->codLinhaIntegra : -1; 
+}
+
+int record_get_codEstIntegra(Record *r) { 
+    return r ? r->codEstIntegra : -1; 
+}
+
+char* record_get_nomeEstacao(Record *r) { 
+    return r ? r->nomeEstacao : NULL; 
+}
+
+char* record_get_nomeLinha(Record *r) { 
+    return r ? r->nomeLinha : NULL; 
+}
+
+Record* record_read_from_file(FILE *fp){
+    Record *r = create_record();
+    if(fread(&r->removido, sizeof(char), 1, fp) != 1){
+        free(&r);
+        return NULL;
+    }
+    fread(&r->proximo, sizeof(int), 1, fp);
+    fread(&r->codEstacao, sizeof(int), 1, fp);
+    fread(&r->codLinha, sizeof(int), 1, fp);
+    fread(&r->codProxEstacao, sizeof(int), 1, fp);
+    fread(&r->distProxEstacao, sizeof(int), 1, fp);
+    fread(&r->codLinhaIntegra, sizeof(int), 1, fp);
+    fread(&r->codEstIntegra, sizeof(int), 1, fp);
+
+    fread(&r->tamNomeEstacao, sizeof(int), 1, fp);
+    if (r->tamNomeEstacao > 0) {
+        r->nomeEstacao = malloc(r->tamNomeEstacao + 1);
+        fread(r->nomeEstacao, 1, r->tamNomeEstacao, fp);
+        r->nomeEstacao[r->tamNomeEstacao] = '\0';
+    }
+
+    fread(&r->tamNomeLinha, sizeof(int), 1, fp);
+    if (r->tamNomeLinha > 0) {
+        r->nomeLinha = malloc(r->tamNomeLinha + 1);
+        fread(r->nomeLinha, 1, r->tamNomeLinha, fp);
+        r->nomeLinha[r->tamNomeLinha] = '\0';
+    }
+    // Pular o lixo para chegar ao próximo registro
+    int ocupado = 37 + r->tamNomeEstacao + r->tamNomeLinha;
+    fseek(fp, 80 - ocupado, SEEK_CUR);
+
+    return r;
+}
 void record_write_to_file(FILE *fp, Record *r) {
     // Escrita dos campos fixos
     fwrite(&r->removido, sizeof(char), 1, fp);
@@ -157,18 +212,19 @@ void record_write_to_file(FILE *fp, Record *r) {
     }
 }
 
-void FreeRecord(Record *r) {
-    if (r == NULL) {
+void free_record(Record **r) {
+    if (*r == NULL) {
         return;
     }
 
-    if (r->nomeEstacao != NULL) {
-        free(r->nomeEstacao);
+    if ((*r)->nomeEstacao != NULL) {
+        free((*r)->nomeEstacao);
     }
     
-    if (r->nomeLinha != NULL) {
-        free(r->nomeLinha);
+    if ((*r)->nomeLinha != NULL) {
+        free((*r)->nomeLinha);
     }
 
-    free(r);
+    free(*r);
+    *r = NULL;
 }
