@@ -7,94 +7,32 @@
 #include "headerRegister.h"
 #include "dataRegister.h"
 
-// Função auxiliar para ler campos do CSV tratando nulos
-char* get_field(char **line) {
-    char *start = *line;
-    char *end = strchr(start, ',');
-    if (end) {
-        *end = '\0';
-        *line = end + 1;
-    } else {
-        // Último campo da linha (que termina em \n ou \r)
-        char *newline = strpbrk(start, "\n\r");
-        if (newline) *newline = '\0';
-        *line = start + strlen(start);
-    }
-    return start;
-}
-
-// Funcao auxiliar para ler os records do file BIN
-char *ler_nomeEstacao(FILE *bin, int posRecord){
-    fseek(bin, posRecord, SEEK_SET);
-    
-    char removido;
-    fread(&removido, sizeof(char), 1, bin);
-
-    if(removido == '1'){
-        return NULL;
-    }
-
-    fseek(bin, posRecord + 30, SEEK_SET);
-
-    int tamNome;
-    fread(&tamNome, sizeof(int), 1, bin);
-
-    char *nome = (char *)malloc((tamNome + 1)* sizeof(char));
-    fread(nome, sizeof(char), tamNome, bin);
-    nome[tamNome] = '\0';
-
-    return nome;
-}
-
-// Funcoes auxiliares
-char **criar_lista_nomesEstacoes(int nroMaxEstacoes){
-    char **lista_nomesEstacoes = (char **)calloc(nroMaxEstacoes, sizeof(char *));
-    if(lista_nomesEstacoes == NULL){
-        printf("Erro: alocação de memória lista de estações!\n");
-        return NULL; 
-    }
-    return lista_nomesEstacoes;
-}
-
-void free_lista_nomesEstacoes(char ***lista, int nroEstacoes){
-    for(int i = 0; i < nroEstacoes; i++){
-        free((*lista)[i]);
-    }
-    free((*lista));
-    *lista = NULL;
-}
-
 typedef struct PARES_ESTACOES
 {
     int codEstacao;
     int proxCodEstacao;
 }paresEstacoes;
-    
-paresEstacoes *criar_lista_paresEstacoes(int nroMaxPares){
-    paresEstacoes *lista_pares = (paresEstacoes *)calloc(nroMaxPares, sizeof(paresEstacoes));
-    if(lista_pares == NULL){
-        printf("Erro: alocação de memória lista de pares de estações!\n");
-        return NULL;
-    }
-    for(int i = 0; i < nroMaxPares; i++){
-        lista_pares[i].codEstacao = -1;
-        lista_pares[i].proxCodEstacao = -1;
-    }
-    return lista_pares;
-}
 
-void free_lista_paresEstacoes(paresEstacoes **lista){
-    free((*lista));
-    *lista = NULL;
-}
+char* get_field(char **line);
 
+char **criar_lista_nomesEstacoes(int nroMaxEstacoes);
+void free_lista_nomesEstacoes(char ***lista, int nroEstacoes);
+paresEstacoes *criar_lista_paresEstacoes(int nroMaxPares);
+void free_lista_paresEstacoes(paresEstacoes **lista);
 
+int ler_campoFixo(FILE *bin, int posRecord, int posOffset);
+char *ler_campoVariavel(FILE *bin, int posRecord, int posOffset);
+void printar_record(FILE *bin, int posRecord);
+bool status_esta_instavel(FILE *bin);
+bool esta_removido(FILE *bin, int posRecord);
+
+// Funcionalidade 1 ------------------------------------------
 void create_table(char *csv_filename, char *bin_filename){
     FILE *csv = fopen(csv_filename, "r");
     FILE *bin = fopen(bin_filename, "wb");
 
     if(!bin || !csv){
-        printf("Falha ao abrir os arquivos!\n");
+        printf("Falha no processamento do arquivo.\n");
         return;
     }
 
@@ -145,7 +83,7 @@ void create_table(char *csv_filename, char *bin_filename){
         record_write_to_file(bin, r);
         free_record(&r);
         
-        // Aumenta a capacidade da lista caso necessario
+        // Aumenta a capacidade das listas caso necessario
         if(nroEstacoes >= nroMaxEstacoes){
             nroMaxEstacoes *= 2;
             lista_nomesEstacoes = realloc(lista_nomesEstacoes, nroMaxEstacoes * sizeof(char *));
@@ -200,6 +138,61 @@ void create_table(char *csv_filename, char *bin_filename){
     fclose(bin);
 }
 
+// Funcionalidade 2 -------------------------------------------
+void print_table(char *bin_filename){
+    FILE *bin = fopen(bin_filename, "rb");
+    if(!bin){
+        printf("Falha no processamento do arquivo.\n");
+        return;
+    }
+    if(status_esta_instavel(bin)){
+        printf("Falha no processamento do arquivo.\n");
+        fclose(bin);
+        return;
+    }
+    
+    // Vai para a posicao do primeiro registro record
+    int RRN = 0, removidos = 0;
+
+    while(1){
+        int posRecord = 17 + RRN * 80;
+        fseek(bin, posRecord, SEEK_SET);
+        
+        // Se nao for possivel ler mais, indica que o arquivo acabou
+        char removido;
+        if(fread(&removido, sizeof(char), 1, bin) != 1)
+            break;
+
+        if(removido == '1'){
+            RRN++;
+            removidos++;
+            continue;
+        }
+    
+        printar_record(bin, posRecord);
+        RRN++;
+    }
+
+    // Caso todos os registros tenham sido removidos 
+    if(removidos == RRN)
+        printf("Registro inexistente.\n");
+
+    fclose(bin);
+}
+
+// Funcionalidade 3 ------------------------------------
+
+
+
+/*
+ * Você não precisa entender o código dessa função.
+ *
+ * Use essa função para comparação no run.codes.
+ * Lembre-se de ter fechado (fclose) o arquivo anteriormente.
+ *
+ * Ela vai abrir de novo para leitura e depois fechar
+ * (você não vai perder pontos por isso se usar ela).
+ */
 void BinarioNaTela(char *arquivo) {
     FILE *fs;
     if (arquivo == NULL || !(fs = fopen(arquivo, "rb"))) {
@@ -227,4 +220,153 @@ void BinarioNaTela(char *arquivo) {
 
     free(mb);
     fclose(fs);
+}
+
+// Função auxiliar para ler campos do CSV tratando nulos
+char* get_field(char **line) {
+    char *start = *line;
+    char *end = strchr(start, ',');
+    if (end) {
+        *end = '\0';
+        *line = end + 1;
+    } else {
+        // Último campo da linha (que termina em \n ou \r)
+        char *newline = strpbrk(start, "\n\r");
+        if (newline) *newline = '\0';
+        *line = start + strlen(start);
+    }
+    return start;
+}
+
+bool status_esta_instavel(FILE *bin){
+    char status;
+    fread(&status, sizeof(char), 1, bin);
+
+    if(status == '0'){
+        return true;
+    }
+
+    return false;
+}
+
+// Funcao auxiliar para ler os campos variaveis dos records do file BIN 
+// (lembre-se de dar free no campo depois e usar o posOffset do tamanho do campo)
+char *ler_campoVariavel(FILE *bin, int posRecord, int posOffset){
+    fseek(bin, posRecord + posOffset, SEEK_SET);
+
+    int tamNome;
+    fread(&tamNome, sizeof(int), 1, bin);
+    
+    if(tamNome > 0){
+        char *nome = (char *)malloc((tamNome + 1)* sizeof(char));
+        fread(nome, sizeof(char), tamNome, bin);
+        nome[tamNome] = '\0';
+
+        return nome;
+    }
+
+    return NULL;
+}
+
+int ler_campoFixo(FILE *bin, int posRecord, int posOffset){
+    fseek(bin, posRecord + posOffset, SEEK_SET);
+
+    int campoFixo;
+    fread(&campoFixo, sizeof(int), 1, bin);
+
+    return campoFixo;
+}
+
+bool esta_removido(FILE *bin, int posRecord){
+    fseek(bin, posRecord, SEEK_SET);
+
+    char removido;
+    fread(&removido, sizeof(char), 1, bin);
+
+    if(removido == '1')
+        return true;
+
+    return false;
+}
+
+void print_auxiliar_record(int codigo){
+    if(codigo == -1)
+        printf("NULO ");
+    else
+        printf("%d ", codigo);
+}
+
+void printar_record(FILE *bin, int posRecord){
+    if(esta_removido(bin, posRecord))
+        return;
+    
+    int posCodEst = 5, posNomeEst = 29, posCodLinha = 9, posCodProxEst = 13, posDistEst = 17, posCodLinhaInt = 21, posCodEstInt = 25;  
+    
+    int codEst = ler_campoFixo(bin, posRecord, posCodEst);
+    char *nomeEst = ler_campoVariavel(bin, posRecord, posNomeEst);
+    
+    printf("%d %s ", codEst, nomeEst);
+
+    // Calcular o posNomeLinha (sempre vai ter nomeEst)
+    int tamanhoEst = strlen(nomeEst);
+    int posNomeLinha = posNomeEst + tamanhoEst + 4;
+    
+    int codLinha = ler_campoFixo(bin, posRecord, posCodLinha);
+    char *nomeLinha = ler_campoVariavel(bin, posRecord, posNomeLinha);
+
+    print_auxiliar_record(codLinha);
+    if(nomeLinha)
+        printf("%s ", nomeLinha);
+    else
+        printf("NULO ");
+
+    int codProxEst = ler_campoFixo(bin, posRecord, posCodProxEst);
+    int distExt = ler_campoFixo(bin, posRecord, posDistEst);
+    int codLinhaInt = ler_campoFixo(bin, posRecord, posCodLinhaInt);
+    int codEstInt = ler_campoFixo(bin, posRecord, posCodEstInt);
+
+    print_auxiliar_record(codProxEst);
+    print_auxiliar_record(distExt);
+    print_auxiliar_record(codLinhaInt);
+    print_auxiliar_record(codEstInt);
+    printf("\b\n");
+
+    free(nomeEst);
+    free(nomeLinha);
+}
+
+// Funcoes auxiliares para verificar nroEstacoes e paresEstacoes
+char **criar_lista_nomesEstacoes(int nroMaxEstacoes){
+    char **lista_nomesEstacoes = (char **)calloc(nroMaxEstacoes, sizeof(char *));
+    if(lista_nomesEstacoes == NULL){
+        printf("Erro: alocação de memória lista de estações!\n");
+        return NULL; 
+    }
+    return lista_nomesEstacoes;
+}
+
+void free_lista_nomesEstacoes(char ***lista, int nroEstacoes){
+    for(int i = 0; i < nroEstacoes; i++){
+        free((*lista)[i]);
+    }
+    free((*lista));
+    *lista = NULL;
+}
+    
+paresEstacoes *criar_lista_paresEstacoes(int nroMaxPares){
+    paresEstacoes *lista_pares = (paresEstacoes *)calloc(nroMaxPares, sizeof(paresEstacoes));
+    if(lista_pares == NULL){
+        printf("Erro: alocação de memória lista de pares de estações!\n");
+        return NULL;
+    }
+    for(int i = 0; i < nroMaxPares; i++){
+        lista_pares[i].codEstacao = -1;
+        lista_pares[i].proxCodEstacao = -1;
+    }
+    return lista_pares;
+}
+
+void free_lista_paresEstacoes(paresEstacoes **lista){
+    free((*lista));
+    *lista = NULL;
 }

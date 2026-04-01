@@ -23,6 +23,9 @@ int main(void){
     }
     case 2:{    
         // funcionalidade 2
+        char arq_bin[100];
+        scanf(" %s", arq_bin);
+        print_table(arq_bin);
         break;
     }
     case 3:{
