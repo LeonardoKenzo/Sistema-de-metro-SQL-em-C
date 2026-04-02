@@ -246,7 +246,7 @@ void remove_record_table(char *bin_filename){
     int n;
     scanf(" %d", &n);
     for(int i = 0; i < n; i++){
-        int m, quantRegistroEncontrado, posRecord, topoAntigo;
+        int m, quantRegistroEncontrado, posRecord, topoAntigo, proximoRRN;
         scanf(" %d", &m);
         Criterio *criterios = input_criterios(m);
 
@@ -260,9 +260,10 @@ void remove_record_table(char *bin_filename){
 
             // Remocao logica e atualizacao do header
             topoAntigo = header_get_topo(header);
+            proximoRRN = (topoAntigo == -1) ? -1 : (topoAntigo - 17) / 80;
             
             record_set_removido(record, '1');
-            record_set_proximo(record, topoAntigo);
+            record_set_proximo(record, proximoRRN);
             
             fseek(bin, posRecord, SEEK_SET);
             record_write_to_file(bin, record);
@@ -317,7 +318,7 @@ void  insert_record_table(char *bin_filename){
         //codLinha
         record_set_codLinha(r, input_inteiro_ou_nulo());
 
-        //nomeLiha
+        //nomeLinha
         ScanQuoteString(buffer_str);
         record_set_nomeLinha(r, buffer_str);
 
