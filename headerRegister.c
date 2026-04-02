@@ -48,6 +48,18 @@ int header_get_topo(Header *h){
     return h->topo;
 }
 
+int header_get_proxRRN(Header *h) {
+    return h->proxRRN;
+}
+
+int header_get_nroEstacoes(Header *h) {
+    return h->nroEstacoes;
+}
+
+int header_get_nroParesEst(Header *h) {
+    return h->nroParesEstacoes;
+}
+
 void header_write_to_file(FILE *fp, Header *h){
     fseek(fp, 0, SEEK_SET);
     fwrite(&h->status, sizeof(char), 1, fp);

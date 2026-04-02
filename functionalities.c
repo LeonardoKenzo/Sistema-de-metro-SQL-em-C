@@ -43,6 +43,9 @@ Record **read_records_at_offset(FILE *bin, int *posOffsetRecords, int tamanhoPos
 void free_search_records(Record ***lista_records, int quantRecordEncontrados);
 bool atende_criterios(Record *r, Criterio *criterios, int m);
 
+// Função auxiliar para ler inteiros que podem ser "NULO" da entrada padrão
+int input_inteiro_ou_nulo();
+
 // Funcionalidade 1 ------------------------------------------
 void create_table(char *csv_filename, char *bin_filename){
     FILE *csv = fopen(csv_filename, "r");
@@ -280,6 +283,87 @@ void remove_record_table(char *bin_filename){
     free_header_register(&header);
     fclose(bin);
 }
+
+// Funcionalidade 5 -----------------------------------
+
+void  insert_record_table(char *bin_filename){
+    FILE *bin = fopen(bin_filename, "r+b");
+    if(!bin || status_esta_instavel(bin)){
+        printf("Falha no processamento do arquivo.\n"); 
+        if (bin) fclose(bin);
+        return;
+    }
+
+    Header *h = create_header_register();
+    header_read_from_file(bin, h);
+    header_set_status(h, '0');
+    header_write_to_file(bin, h);
+
+    int n;
+    scanf(" %d", &n);
+
+    for(int i = 0; i < n; i++){
+        Record *r = create_record();
+        char buffer_str[100];
+
+        int codEstacao;
+        scanf(" %d", &codEstacao);
+        record_set_codEstacao(r,codEstacao);
+
+        // nomeEstacao (não aceita nulo)
+        ScanQuoteString(buffer_str);
+        record_set_nomeEstacao(r, buffer_str);
+
+        //codLinha
+        record_set_codLinha(r, input_inteiro_ou_nulo());
+
+        //nomeLiha
+        ScanQuoteString(buffer_str);
+        record_set_nomeLinha(r, buffer_str);
+
+        // Campos que são inteiros ou nulos
+        record_set_codProxEstacao(r, input_inteiro_ou_nulo());
+        record_set_distProxEstacao(r, input_inteiro_ou_nulo());
+        record_set_codLinhaIntegra(r, input_inteiro_ou_nulo());
+        record_set_codEstIntegra(r, input_inteiro_ou_nulo());
+
+        int topo = header_get_topo(h);
+
+        if (topo == -1) {
+            // Caso 1: Pilha vazia, insere no fim do arquivo
+            int proxRRN = header_get_proxRRN(h);
+            fseek(bin, 17 + (proxRRN * 80), SEEK_SET);
+            record_write_to_file(bin, r);
+            header_set_proxRRN(h, proxRRN + 1);
+        }
+        else {
+            // Caso 2: Reaproveitamento de espaço (Pilha)
+            // Vai até o registro removido indicado pelo topo
+            fseek(bin, (topo), SEEK_SET);
+            
+            // Lê o RRN do próximo da pilha antes de sobrescrever
+            char removido_flag;
+            int prox_na_pilha;
+            fread(&removido_flag, sizeof(char), 1, bin);
+            fread(&prox_na_pilha, sizeof(int), 1, bin);
+        
+        // Volta para a posição do registro e escreve o novo dado
+            fseek(bin, (topo), SEEK_SET);
+            record_write_to_file(bin, r);
+
+            // Atualiza o topo do cabeçalho com o próximo da lista encadeada
+            int novo_topo_offset = (prox_na_pilha == -1) ? -1 : 17 + (prox_na_pilha * 80);
+            header_set_topo(h, novo_topo_offset);
+        }
+        free_record(&r);
+    }
+    header_set_status(h, '1'); 
+    header_write_to_file(bin, h);
+    
+    free_header_register(&h);
+    fclose(bin);
+}
+
 
 // Funcoes auxiliares -----------------------------------------------------
 
@@ -576,4 +660,11 @@ bool atende_criterios(Record *r, Criterio *criterios, int m){
         }
     }
     return true;
+}
+
+int input_inteiro_ou_nulo() {
+    char buffer[20];
+    if (scanf("%s", buffer) != 1) return -1;
+    if (strcmp(buffer, "NULO") == 0) return -1;
+    return atoi(buffer);
 }

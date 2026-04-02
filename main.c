@@ -44,7 +44,10 @@ int main(void){
         break;
     }
     case 5:{
-        // funcionalidade 5
+        char arq_bin[100];
+        scanf("%s", arq_bin);
+        insert_record_table(arq_bin);
+        BinarioNaTela(arq_bin); 
         break;
     }
     case 6:{
