@@ -44,12 +44,26 @@ void header_set_nroParesEst(Header *h, int nroParesEst){
     h->nroParesEstacoes = nroParesEst;
 }
 
+int header_get_topo(Header *h){
+    return h->topo;
+}
+
 void header_write_to_file(FILE *fp, Header *h){
+    fseek(fp, 0, SEEK_SET);
     fwrite(&h->status, sizeof(char), 1, fp);
     fwrite(&h->topo, sizeof(int), 1, fp);
     fwrite(&h->proxRRN, sizeof(int), 1, fp);
     fwrite(&h->nroEstacoes, sizeof(int), 1, fp);
     fwrite(&h->nroParesEstacoes, sizeof(int), 1, fp);
+}
+
+void header_read_from_file(FILE *fp, Header *h){
+    fseek(fp, 0, SEEK_SET);
+    fread(&h->status, sizeof(char), 1, fp);
+    fread(&h->topo, sizeof(int), 1, fp);
+    fread(&h->proxRRN, sizeof(int), 1, fp);
+    fread(&h->nroEstacoes, sizeof(int), 1, fp);
+    fread(&h->nroParesEstacoes, sizeof(int), 1, fp);
 }
 
 void free_header_register(Header **hRegister){

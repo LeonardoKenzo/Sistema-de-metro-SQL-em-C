@@ -4,6 +4,7 @@
 #include "headerRegister.h"
 #include "dataRegister.h"
 #include "functionalities.h"
+#include "fornecidas.h"
 
 
 int main(void){
@@ -30,13 +31,16 @@ int main(void){
     }
     case 3:{
         char arq_bin[100];
-        scanf("%s", arq_bin);
+        scanf(" %s", arq_bin);
         search_table(arq_bin);
-
         break;
     }
     case 4:{
         // funcionalidade 4
+        char arq_bin[100];
+        scanf(" %s", arq_bin);
+        remove_record_table(arq_bin);
+        BinarioNaTela(arq_bin);
         break;
     }
     case 5:{

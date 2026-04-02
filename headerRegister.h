@@ -15,6 +15,9 @@
     void header_set_nroEstacoes(Header *h, int nroEstacoes);
     void header_set_nroParesEst(Header *h, int nroParesEst);
 
+    // Getters
+    int header_get_topo(Header *h);
+
     // I/O - Escrita campo a campo
     void header_write_to_file(FILE *fp, Header *h);
     void header_read_from_file(FILE *fp, Header *h);

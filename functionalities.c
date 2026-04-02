@@ -6,14 +6,15 @@
 #include <stdbool.h>
 #include "headerRegister.h"
 #include "dataRegister.h"
+#include "fornecidas.h"
 
-typedef struct PARES_ESTACOES
-{
+// Estrutura auxiliar para armazenar pares de estacoes
+typedef struct {
     int codEstacao;
     int proxCodEstacao;
 }paresEstacoes;
 
-// Estrutura auxiliar para armazenar os critérios de busca
+// Estrutura auxiliar para armazenar os criterios de busca
 typedef struct {
     char nomeCampo[50];
     char valorCampo[100];
@@ -21,11 +22,13 @@ typedef struct {
 
 char* get_field(char **line);
 
+// Funcoes para verificar o nroEstacoes e nroParEstacoes do header
 char **criar_lista_nomesEstacoes(int nroMaxEstacoes);
 void free_lista_nomesEstacoes(char ***lista, int nroEstacoes);
 paresEstacoes *criar_lista_paresEstacoes(int nroMaxPares);
 void free_lista_paresEstacoes(paresEstacoes **lista);
 
+// Funcoes para ler um registro de um arquivo.bin
 int ler_campoFixo(FILE *bin, int posRecord, int posOffset);
 char *ler_campoVariavel(FILE *bin, int posRecord, int posOffset);
 void printar_record_object(Record *r);
@@ -33,9 +36,12 @@ void printar_record(FILE *bin, int posRecord);
 bool status_esta_instavel(FILE *bin);
 bool esta_removido(FILE *bin, int posRecord);
 
-// Função para verificar se um registro atende aos critérios
+// Funcoes para buscar um registro a partir de criterios
+Criterio *input_criterios(int m);
+int *search_offset_records(FILE *bin, Criterio *criterios, int m, int *quantRecordEncontrados);
+Record **read_records_at_offset(FILE *bin, int *posOffsetRecords, int tamanhoPosOffset);
+void free_search_records(Record ***lista_records, int quantRecordEncontrados);
 bool atende_criterios(Record *r, Criterio *criterios, int m);
-void ScanQuoteString(char *str);
 
 // Funcionalidade 1 ------------------------------------------
 void create_table(char *csv_filename, char *bin_filename){
@@ -152,19 +158,15 @@ void create_table(char *csv_filename, char *bin_filename){
 // Funcionalidade 2 -------------------------------------------
 void print_table(char *bin_filename){
     FILE *bin = fopen(bin_filename, "rb");
-    if(!bin){
+    if(!bin || status_esta_instavel(bin)){
         printf("Falha no processamento do arquivo.\n");
-        return;
-    }
-    if(status_esta_instavel(bin)){
-        printf("Falha no processamento do arquivo.\n");
-        fclose(bin);
+        if(bin)
+            fclose(bin);
         return;
     }
     
     // Vai para a posicao do primeiro registro record
     int RRN = 0, removidos = 0;
-
     while(1){
         int posRecord = 17 + RRN * 80;
         fseek(bin, posRecord, SEEK_SET);
@@ -202,82 +204,84 @@ void search_table(char *bin_filename){
 
     int n;
     scanf(" %d", &n);
-
     for(int i = 0; i < n; i++){
-        int m;
+        int m, quantRegistroEncontrado;
         scanf(" %d", &m);
-        Criterio *criterios = malloc(sizeof(Criterio) * m);
-        
-        for(int j = 0; j < m; j++){
-            scanf("%s", criterios[j].nomeCampo);
-            // scan_quote_string lida com aspas em strings
-            ScanQuoteString(criterios[j].valorCampo); 
+        Criterio *criterios = input_criterios(m);
+
+        // Todos os registros encontrados na busca
+        int *lista_posOffset_records = search_offset_records(bin, criterios, m, &quantRegistroEncontrado); // Filtra por criterio
+        Record **lista_records = read_records_at_offset(bin, lista_posOffset_records, quantRegistroEncontrado); // Carrega os registros
+        for(int j = 0; j < quantRegistroEncontrado; j++){
+            printar_record_object(lista_records[j]);
         }
-
-        printf("Busca %d\n", i+1);
-        fseek(bin, 17, SEEK_SET);
-
-        bool encontrado = false;
-        Record *r;
-
-        while((r = record_read_from_file(bin)) != NULL){
-            if (record_get_removido(r) == "1"){
-                free_record(&r);
-                continue;
-            }
-
-            if(atende_criterios(r, criterios, m)){
-                printar_record_object(r);
-                encontrado=true;
-            }
-            free_record(&r);
-        }
-        if(!encontrado){
+        if(quantRegistroEncontrado == 0){
             printf("Registro inexistente.\n");
         }
+
         free(criterios);
+        free(lista_posOffset_records);
+        free_search_records(&lista_records, quantRegistroEncontrado);
     }
     fclose(bin);
 }
 
-
-/*
- * Você não precisa entender o código dessa função.
- *
- * Use essa função para comparação no run.codes.
- * Lembre-se de ter fechado (fclose) o arquivo anteriormente.
- *
- * Ela vai abrir de novo para leitura e depois fechar
- * (você não vai perder pontos por isso se usar ela).
- */
-void BinarioNaTela(char *arquivo) {
-    FILE *fs;
-    if (arquivo == NULL || !(fs = fopen(arquivo, "rb"))) {
-        fprintf(stderr,
-                "ERRO AO ESCREVER O BINARIO NA TELA (função binarioNaTela): "
-                "não foi possível abrir o arquivo que me passou para leitura. "
-                "Ele existe e você tá passando o nome certo? Você lembrou de "
-                "fechar ele com fclose depois de usar?\n");
+// Funcionalidade 4 -----------------------------------
+void remove_record_table(char *bin_filename){
+    FILE *bin = fopen(bin_filename, "r+b");
+    if(!bin || status_esta_instavel(bin)){
+        printf("Falha no processamento do arquivo.\n");
+        if (bin) fclose(bin);
         return;
     }
+    // Marcar o header como instavel
+    Header *header = create_header_register();
+    header_read_from_file(bin, header);
+    header_set_status(header, '0');
+    header_write_to_file(bin, header);
 
-    fseek(fs, 0, SEEK_END);
-    size_t fl = ftell(fs);
+    int n;
+    scanf(" %d", &n);
+    for(int i = 0; i < n; i++){
+        int m, quantRegistroEncontrado, posRecord, topoAntigo;
+        scanf(" %d", &m);
+        Criterio *criterios = input_criterios(m);
 
-    fseek(fs, 0, SEEK_SET);
-    unsigned char *mb = (unsigned char *)malloc(fl);
-    fread(mb, 1, fl, fs);
+        // Todos os registros encontrados na busca
+        int *lista_posOffset_records = search_offset_records(bin, criterios, m, &quantRegistroEncontrado); // Filtra por criterio
+        Record **lista_records = read_records_at_offset(bin, lista_posOffset_records, quantRegistroEncontrado); // Carrega os registros
+        for(int j = 0; j < quantRegistroEncontrado; j++){
 
-    unsigned long cs = 0;
-    for (unsigned long i = 0; i < fl; i++) {
-        cs += (unsigned long)mb[i];
+            Record *record = lista_records[j];
+            posRecord = lista_posOffset_records[j];
+
+            // Remocao logica e atualizacao do header
+            topoAntigo = header_get_topo(header);
+            
+            record_set_removido(record, '1');
+            record_set_proximo(record, topoAntigo);
+            
+            fseek(bin, posRecord, SEEK_SET);
+            record_write_to_file(bin, record);
+
+            header_set_topo(header, posRecord);
+            header_write_to_file(bin, header);
+        }
+
+        free(criterios);
+        free(lista_posOffset_records);
+        free_search_records(&lista_records, quantRegistroEncontrado);
     }
 
-    printf("%lf\n", (cs / (double)100));
+    // Marcar o header como estavel
+    header_set_status(header, '1');
+    header_write_to_file(bin, header);
 
-    free(mb);
-    fclose(fs);
+    free_header_register(&header);
+    fclose(bin);
 }
+
+// Funcoes auxiliares -----------------------------------------------------
 
 // Função auxiliar para ler campos do CSV tratando nulos
 char* get_field(char **line) {
@@ -377,7 +381,7 @@ void printar_record_object(Record *r) {
     print_int_or_nulo(record_get_codLinha(r));
     printf(" ");
 
-    // 4. nomeLinha
+    // nomeLinha
     print_str_or_nulo(record_get_nomeLinha(r));
     printf(" ");
 
@@ -449,11 +453,91 @@ void free_lista_paresEstacoes(paresEstacoes **lista){
     *lista = NULL;
 }
 
+Record **read_records_at_offset(FILE *bin, int *posOffsetRecords, int tamanhoPosOffset){
+    Record **lista_records = (Record **)calloc(tamanhoPosOffset, sizeof(Record *));
+    if(!lista_records){
+        printf("Erro: alocação de memória busca de registros.\n");
+        return NULL;
+    }
+
+    Record *r;
+    for(int i = 0; i < tamanhoPosOffset; i++){
+        int posRecord = posOffsetRecords[i];
+        fseek(bin, posRecord, SEEK_SET);
+
+        r = record_read_from_file(bin);
+        if(r == NULL){
+            printf("Erro: alocação de memória ao criar registro de dados!.\n");
+            return NULL;
+        }
+
+        lista_records[i] = r;
+    }
+
+    return lista_records;
+}
+
+void free_search_records(Record ***lista_records, int quantRecordEncontrados){
+    if((*lista_records) == NULL)
+        return;
+    for(int i = 0; i < quantRecordEncontrados; i++){
+        free_record(&(*lista_records)[i]);
+    }
+    free((*lista_records));
+    *lista_records = NULL;
+}   
+
+int *search_offset_records(FILE *bin, Criterio *criterios, int m, int *quantRecordEncontrados){
+    int quantRecords = 0, quantRecordsMax = 10;
+    int *lista_posOffset_records = (int *)calloc(quantRecordsMax, sizeof(int));
+    if(!lista_posOffset_records){
+        printf("Erro: alocação de memória busca de registros.\n");
+        return NULL;
+    }
+
+    fseek(bin, 17, SEEK_SET); // Posiciona o cursor no primeiro registro
+
+    Record *r;
+
+    while((r = record_read_from_file(bin)) != NULL){
+        int posRecord = ftell(bin) - 80;
+
+        if (record_get_removido(r) == '1'){
+            free_record(&r);
+            continue;
+        }
+
+        if(atende_criterios(r, criterios, m)){
+            if(quantRecords >= quantRecordsMax){
+                quantRecordsMax *= 2;
+                lista_posOffset_records = realloc(lista_posOffset_records, quantRecordsMax * sizeof(int));
+            }
+            lista_posOffset_records[quantRecords++] = posRecord;
+        }
+        
+        free_record(&r);
+    }
+
+    *quantRecordEncontrados = quantRecords;
+    return lista_posOffset_records;
+}
+
+Criterio *input_criterios(int m){
+    Criterio *criterios = malloc(sizeof(Criterio) * m);
+        
+    for(int j = 0; j < m; j++){
+        scanf("%s", criterios[j].nomeCampo);
+        // scan_quote_string lida com aspas em strings
+        ScanQuoteString(criterios[j].valorCampo); 
+    }
+
+    return criterios;
+}
 
 bool atende_criterios(Record *r, Criterio *criterios, int m){
     for(int i = 0; i < m; i++){
         if (strncmp(criterios[i].nomeCampo, "codEstacao", 10) == 0) {
-            if (record_get_codEstacao(r) != atoi(criterios[i].valorCampo)) 
+            if (record_get_codEstacao(r) != atoi(criterios[i].valorCampo))
                 return false;
         } 
         else if (strncmp(criterios[i].nomeCampo, "codLinha", 8) == 0) {
@@ -492,30 +576,4 @@ bool atende_criterios(Record *r, Criterio *criterios, int m){
         }
     }
     return true;
-}
-
-void ScanQuoteString(char *str) {
-    char R;
-
-    while ((R = getchar()) != EOF && isspace(R))
-        ; // ignorar espaços, \r, \n...
-
-    if (R == 'N' || R == 'n') { // campo NULO
-        getchar();
-        getchar();
-        getchar();       // ignorar o "ULO" de NULO.
-        strcpy(str, ""); // copia string vazia
-    } else if (R == '\"') {
-        if (scanf("%[^\"]", str) != 1) { // ler até o fechamento das aspas
-            strcpy(str, "");
-        }
-        getchar();         // ignorar aspas fechando
-    } else if (R != EOF) { // vc tá tentando ler uma string que não tá entre
-                           // aspas! Fazer leitura normal %s então, pois deve
-                           // ser algum inteiro ou algo assim...
-        str[0] = R;
-        scanf("%s", &str[1]);
-    } else { // EOF
-        strcpy(str, "");
-    }
 }

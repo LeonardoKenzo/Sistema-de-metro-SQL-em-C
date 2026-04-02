@@ -10,5 +10,6 @@
     void create_table(char *csv_filename,char *bin_filename);
     void print_table(char *bin_filename);
     void search_table(char *bin_filename);
-    void BinarioNaTela(char *arquivo);
+    void remove_record_table(char *bin_filename);
+
 #endif

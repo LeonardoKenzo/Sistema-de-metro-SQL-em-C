@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "fornecidas.h"
 
 /*
  * Você não precisa entender o código dessa função.
@@ -72,9 +73,15 @@ void ScanQuoteString(char *str) {
         getchar();         // ignorar aspas fechando
     } else if (R != EOF) { // vc tá tentando ler uma string que não tá entre
                            // aspas! Fazer leitura normal %s então, pois deve
-                           // ser algum inteiro ou algo assim...
-        str[0] = R;
-        scanf("%s", &str[1]);
+                           // ser algum inteiro ou algo assim... 
+                           //(MUDANCA FEITA POR KENZO)
+        int i = 0;
+        str[i++] = R;
+        while((R = getchar()) != EOF && !isspace(R)){ //Le enquanto ainda tiver conteudo
+            str[i++] = R;
+        }
+        str[i] = '\0';
+
     } else { // EOF
         strcpy(str, "");
     }
