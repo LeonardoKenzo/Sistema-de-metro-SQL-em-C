@@ -24,6 +24,20 @@
     void record_set_nomeEstacao(Record *r, char *nome);
     void record_set_nomeLinha(Record *r, char *nome);
 
+    // Getters
+    char record_get_removido(Record *r);
+    int record_get_codEstacao(Record *r);
+    int record_get_codLinha(Record *r);
+    int record_get_codProxEstacao(Record *r);
+    int record_get_distProxEstacao(Record *r);
+    int record_get_codLinhaIntegra(Record *r);
+    int record_get_codEstIntegra(Record *r);
+
+    char* record_get_nomeEstacao(Record *r);
+    char* record_get_nomeLinha(Record *r);
+
+    Record* record_read_from_file(FILE *fp);
+
     // Escrita campo a campo com preenchimento de lixo ($)
     void record_write_to_file(FILE *fp, Record *r);
     
