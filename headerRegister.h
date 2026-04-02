@@ -17,6 +17,9 @@
 
     // Getters
     int header_get_topo(Header *h);
+    int header_get_proxRRN(Header *h);
+    int header_get_nroEstacoes(Header *h);
+    int header_get_nroParesEst(Header *h);
 
     // I/O - Escrita campo a campo
     void header_write_to_file(FILE *fp, Header *h);
