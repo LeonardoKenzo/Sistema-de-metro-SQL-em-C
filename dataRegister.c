@@ -22,8 +22,8 @@ Record *create_record() {
     }
 
     // Inicialização de controle de registros
-    r->removido = '0';          // Inicia como não removido
-    r->proximo = -1;            // Valor padrão para ausência de próximo 
+    r->removido = '0';
+    r->proximo = -1;
 
     // Campos de tamanho fixo: Inicializados com -1 para representar valores nulos
     r->codEstacao = -1;

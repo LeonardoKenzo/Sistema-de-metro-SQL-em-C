@@ -15,11 +15,11 @@ int main(void){
     switch (funcionalidade)
     {
     case 1:{   
-        // funcionalidade 1 (CREATE TABLE)
+        // funcionalidade 1
         char arq_csv[100], arq_bin[100];
         scanf(" %s %s", arq_csv, arq_bin);
-        create_table(arq_csv, arq_bin);
-        BinarioNaTela(arq_bin);
+        if(create_table(arq_csv, arq_bin))
+            BinarioNaTela(arq_bin);
         break;
     }
     case 2:{    
@@ -30,6 +30,7 @@ int main(void){
         break;
     }
     case 3:{
+        // funcionalidade 3
         char arq_bin[100];
         scanf(" %s", arq_bin);
         search_table(arq_bin);

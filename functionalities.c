@@ -8,12 +8,6 @@
 #include "dataRegister.h"
 #include "fornecidas.h"
 
-// Estrutura auxiliar para armazenar pares de estacoes
-typedef struct {
-    int codEstacao;
-    int proxCodEstacao;
-}paresEstacoes;
-
 // Estrutura auxiliar para armazenar os criterios de busca
 typedef struct {
     char nomeCampo[50];
@@ -21,12 +15,6 @@ typedef struct {
 } Criterio;
 
 char* get_field(char **line);
-
-// Funcoes para verificar o nroEstacoes e nroParEstacoes do header
-char **criar_lista_nomesEstacoes(int nroMaxEstacoes);
-void free_lista_nomesEstacoes(char ***lista, int nroEstacoes);
-paresEstacoes *criar_lista_paresEstacoes(int nroMaxPares);
-void free_lista_paresEstacoes(paresEstacoes **lista);
 
 // Funcoes para ler um registro de um arquivo.bin
 int ler_campoFixo(FILE *bin, int posRecord, int posOffset);
@@ -48,13 +36,13 @@ bool atende_criterios(Record *r, Criterio *criterios, int m);
 int input_inteiro_ou_nulo();
 
 // Funcionalidade 1 ------------------------------------------
-void create_table(char *csv_filename, char *bin_filename){
+bool create_table(char *csv_filename, char *bin_filename){
     FILE *csv = fopen(csv_filename, "r");
     FILE *bin = fopen(bin_filename, "wb");
 
     if(!bin || !csv){
         printf("Falha no processamento do arquivo.\n");
-        return;
+        return false;
     }
 
     // Criar e escrever cabeçalho inicial (status '0')
@@ -107,43 +95,27 @@ void create_table(char *csv_filename, char *bin_filename){
         // Aumenta a capacidade das listas caso necessario
         if(nroEstacoes >= nroMaxEstacoes){
             nroMaxEstacoes *= 2;
-            lista_nomesEstacoes = realloc(lista_nomesEstacoes, nroMaxEstacoes * sizeof(char *));
-            for(int i = nroEstacoes; i < nroMaxEstacoes; i++)
-                lista_nomesEstacoes[i] = NULL;
+            aumentar_capacidade_nomesEstacoes(&lista_nomesEstacoes, nroEstacoes, nroMaxEstacoes);
         }
+
         if(nroPares >= nroMaxPares){
             nroMaxPares *= 2;
-            lista_paresEstacoes = realloc(lista_paresEstacoes, nroMaxPares * sizeof(paresEstacoes));
+            aumentar_capacidade_paresEstacoes(&lista_paresEstacoes, nroPares, nroMaxPares);
         }
-        
-        // Verificar quantidade de nomes e pares de estacoes diferentes
-        int repetidoNome = 0, repetidoPar = 0;
-        
-        // Percorre a lista comparando se possui nomes repetidos
-        int tamanho = strlen(nomeEst);
-        for(int i = 0; i < nroEstacoes; i++){
-            if(lista_nomesEstacoes[i] != NULL)
-                repetidoNome = (strcmp(lista_nomesEstacoes[i], nomeEst) == 0) ? repetidoNome + 1 : repetidoNome;
-        }
-        if(repetidoNome <= 0){
-            lista_nomesEstacoes[nroEstacoes] = (char *)calloc(tamanho + 1, sizeof(char));
-            strcpy(lista_nomesEstacoes[nroEstacoes], nomeEst);
+
+        if(tem_repetidos_nomesEstacoes(lista_nomesEstacoes, nroEstacoes, nomeEst) == false){
+            adicionar_nomesEstacoes(lista_nomesEstacoes, nroEstacoes, nomeEst);
             nroEstacoes++;
         }
 
-        // Mesma logica da lista_nomeEstacoes
-        for(int i = 0; i < nroPares; i++){
-            repetidoPar = (lista_paresEstacoes[i].codEstacao == codEst && lista_paresEstacoes[i].proxCodEstacao == codProx) ? repetidoPar + 1 : repetidoPar;
-        }
-        if(repetidoPar <= 0){
-            lista_paresEstacoes[nroPares].codEstacao = codEst;
-            lista_paresEstacoes[nroPares].proxCodEstacao = codProx;
+        if(tem_repetido_paresEstacoes(lista_paresEstacoes, nroPares, codEst, codProx) == false && codProx != -1){
+            adicionar_paresEstacoes(lista_paresEstacoes, nroPares, codEst, codProx);
             nroPares++;
         }
         
         rrn_count++;
     }
-
+    
     header_set_status(h, '1');
     header_set_proxRRN(h, rrn_count);
     header_set_nroEstacoes(h, nroEstacoes);
@@ -156,6 +128,7 @@ void create_table(char *csv_filename, char *bin_filename){
     free_header_register(&h);
     fclose(csv);
     fclose(bin);
+    return true;
 }
 
 // Funcionalidade 2 -------------------------------------------
@@ -222,10 +195,13 @@ void search_table(char *bin_filename){
             printf("Registro inexistente.\n");
         }
 
+        printf("\n");
+
         free(criterios);
         free(lista_posOffset_records);
         free_search_records(&lista_records, quantRegistroEncontrado);
     }
+
     fclose(bin);
 }
 
@@ -242,6 +218,11 @@ void remove_record_table(char *bin_filename){
     header_read_from_file(bin, header);
     header_set_status(header, '0');
     header_write_to_file(bin, header);
+
+    // Listas para atualizar os numeros de estacoes e pares do header
+    int nroMaxPares = 10, nroMaxNomes = 10;
+    char **lista_nomesEstacoes = criar_lista_nomesEstacoes(nroMaxNomes);
+    paresEstacoes *lista_paresEstacoes = criar_lista_paresEstacoes(nroMaxPares);
 
     int n;
     scanf(" %d", &n);
@@ -271,16 +252,26 @@ void remove_record_table(char *bin_filename){
             header_set_topo(header, posRecord);
             header_write_to_file(bin, header);
         }
-
+        
         free(criterios);
         free(lista_posOffset_records);
         free_search_records(&lista_records, quantRegistroEncontrado);
     }
 
+    // Verifica a quantidade de nomes diferentes de estacoes e de pares de estacoes
+    int nroNomesEncontrados = 0, nroParesEncontrados = 0;
+    achar_todos_nomesEstacoes(bin, &lista_nomesEstacoes, &nroNomesEncontrados, &nroMaxNomes);
+    achar_todos_paresEstacoes(bin, &lista_paresEstacoes, &nroParesEncontrados, &nroMaxPares);
+    
+    header_set_nroEstacoes(header, nroNomesEncontrados);
+    header_set_nroParesEst(header, nroParesEncontrados);
+    
     // Marcar o header como estavel
     header_set_status(header, '1');
     header_write_to_file(bin, header);
-
+    
+    free_lista_nomesEstacoes(&lista_nomesEstacoes, nroNomesEncontrados);
+    free_lista_paresEstacoes(&lista_paresEstacoes);
     free_header_register(&header);
     fclose(bin);
 }
@@ -299,6 +290,11 @@ void insert_record_table(char *bin_filename){
     header_read_from_file(bin, h);
     header_set_status(h, '0');
     header_write_to_file(bin, h);
+
+    // Listas para atualizar os numeros de estacoes e pares do header
+    int nroMaxPares = 10, nroMaxNomes = 10;
+    char **lista_nomesEstacoes = criar_lista_nomesEstacoes(nroMaxNomes);
+    paresEstacoes *lista_paresEstacoes = criar_lista_paresEstacoes(nroMaxPares);
 
     int n;
     scanf(" %d", &n);
@@ -340,7 +336,7 @@ void insert_record_table(char *bin_filename){
         else {
             // Caso 2: Reaproveitamento de espaço (Pilha)
             // Vai até o registro removido indicado pelo topo
-            fseek(bin, (topo), SEEK_SET);
+            fseek(bin, topo, SEEK_SET);
             
             // Lê o RRN do próximo da pilha antes de sobrescrever
             char removido_flag;
@@ -348,7 +344,7 @@ void insert_record_table(char *bin_filename){
             fread(&removido_flag, sizeof(char), 1, bin);
             fread(&prox_na_pilha, sizeof(int), 1, bin);
         
-        // Volta para a posição do registro e escreve o novo dado
+            // Volta para a posição do registro e escreve o novo dado
             fseek(bin, (topo), SEEK_SET);
             record_write_to_file(bin, r);
 
@@ -358,9 +354,20 @@ void insert_record_table(char *bin_filename){
         }
         free_record(&r);
     }
+
+    // Verifica a quantidade de nomes diferentes de estacoes e de pares de estacoes
+    int nroNomesEncontrados = 0, nroParesEncontrados = 0;
+    achar_todos_nomesEstacoes(bin, &lista_nomesEstacoes, &nroNomesEncontrados, &nroMaxNomes);
+    achar_todos_paresEstacoes(bin, &lista_paresEstacoes, &nroParesEncontrados, &nroMaxPares);
+    
+    header_set_nroEstacoes(h, nroNomesEncontrados);
+    header_set_nroParesEst(h, nroParesEncontrados);
+
     header_set_status(h, '1'); 
     header_write_to_file(bin, h);
     
+    free_lista_nomesEstacoes(&lista_nomesEstacoes, nroNomesEncontrados);
+    free_lista_paresEstacoes(&lista_paresEstacoes);
     free_header_register(&h);
     fclose(bin);
 }
@@ -551,43 +558,6 @@ void printar_record(FILE *bin, int posRecord){
     }
 }
 
-
-// Funcoes auxiliares para verificar nroEstacoes e paresEstacoes
-char **criar_lista_nomesEstacoes(int nroMaxEstacoes){
-    char **lista_nomesEstacoes = (char **)calloc(nroMaxEstacoes, sizeof(char *));
-    if(lista_nomesEstacoes == NULL){
-        printf("Erro: alocação de memória lista de estações!\n");
-        return NULL; 
-    }
-    return lista_nomesEstacoes;
-}
-
-void free_lista_nomesEstacoes(char ***lista, int nroEstacoes){
-    for(int i = 0; i < nroEstacoes; i++){
-        free((*lista)[i]);
-    }
-    free((*lista));
-    *lista = NULL;
-}
-    
-paresEstacoes *criar_lista_paresEstacoes(int nroMaxPares){
-    paresEstacoes *lista_pares = (paresEstacoes *)calloc(nroMaxPares, sizeof(paresEstacoes));
-    if(lista_pares == NULL){
-        printf("Erro: alocação de memória lista de pares de estações!\n");
-        return NULL;
-    }
-    for(int i = 0; i < nroMaxPares; i++){
-        lista_pares[i].codEstacao = -1;
-        lista_pares[i].proxCodEstacao = -1;
-    }
-    return lista_pares;
-}
-
-void free_lista_paresEstacoes(paresEstacoes **lista){
-    free((*lista));
-    *lista = NULL;
-}
-
 Record **read_records_at_offset(FILE *bin, int *posOffsetRecords, int tamanhoPosOffset){
     Record **lista_records = (Record **)calloc(tamanhoPosOffset, sizeof(Record *));
     if(!lista_records){
@@ -675,6 +645,11 @@ bool atende_criterios(Record *r, Criterio *criterios, int m){
             if (record_get_codEstacao(r) != atoi(criterios[i].valorCampo))
                 return false;
         } 
+        else if (strncmp(criterios[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
+            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            if (record_get_codLinhaIntegra(r) != val) 
+                return false;
+        } 
         else if (strncmp(criterios[i].nomeCampo, "codLinha", 8) == 0) {
             if (record_get_codLinha(r) != atoi(criterios[i].valorCampo)) 
                 return false;
@@ -687,11 +662,6 @@ bool atende_criterios(Record *r, Criterio *criterios, int m){
         else if (strncmp(criterios[i].nomeCampo, "distProxEstacao", 15) == 0) {
             int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
             if (record_get_distProxEstacao(r) != val) 
-                return false;
-        } 
-        else if (strncmp(criterios[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
-            if (record_get_codLinhaIntegra(r) != val) 
                 return false;
         } 
         else if (strncmp(criterios[i].nomeCampo, "codEstIntegra", 13) == 0) {
@@ -718,6 +688,10 @@ void update_register(Record *r, Criterio *atualizar, int p){
         if (strncmp(atualizar[i].nomeCampo, "codEstacao", 10) == 0) {
             record_set_codEstacao(r, atoi(atualizar[i].valorCampo));
         } 
+        else if (strncmp(atualizar[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
+            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
+            record_set_codLinhaIntegra(r, val);
+        } 
         else if (strncmp(atualizar[i].nomeCampo, "codLinha", 8) == 0) {
             record_set_codLinha(r, atoi(atualizar[i].valorCampo));
         } 
@@ -728,10 +702,6 @@ void update_register(Record *r, Criterio *atualizar, int p){
         else if (strncmp(atualizar[i].nomeCampo, "distProxEstacao", 15) == 0) {
             int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
             record_set_distProxEstacao(r, val);
-        } 
-        else if (strncmp(atualizar[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
-            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
-            record_set_codLinhaIntegra(r, val);
         } 
         else if (strncmp(atualizar[i].nomeCampo, "codEstIntegra", 13) == 0) {
             int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
