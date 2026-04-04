@@ -227,7 +227,7 @@ void remove_record_table(char *bin_filename){
     int n;
     scanf(" %d", &n);
     for(int i = 0; i < n; i++){
-        int m, quantRegistroEncontrado, posRecord, topoAntigo, proximoRRN;
+        int m, quantRegistroEncontrado, posRecord, topoAntigo, proximoRRN, novoTopo;
         scanf(" %d", &m);
         Criterio *criterios = input_criterios(m);
 
@@ -241,7 +241,8 @@ void remove_record_table(char *bin_filename){
 
             // Remocao logica e atualizacao do header
             topoAntigo = header_get_topo(header);
-            proximoRRN = (topoAntigo == -1) ? -1 : (topoAntigo - 17) / 80;
+            proximoRRN = topoAntigo;
+            novoTopo = (posRecord - 17) / 80;
             
             record_set_removido(record, '1');
             record_set_proximo(record, proximoRRN);
@@ -249,7 +250,7 @@ void remove_record_table(char *bin_filename){
             fseek(bin, posRecord, SEEK_SET);
             record_write_to_file(bin, record);
 
-            header_set_topo(header, posRecord);
+            header_set_topo(header, novoTopo);
             header_write_to_file(bin, header);
         }
         
@@ -336,21 +337,22 @@ void insert_record_table(char *bin_filename){
         else {
             // Caso 2: Reaproveitamento de espaço (Pilha)
             // Vai até o registro removido indicado pelo topo
+            topo = 17 + topo * 80;
             fseek(bin, topo, SEEK_SET);
             
             // Lê o RRN do próximo da pilha antes de sobrescrever
-            char removido_flag;
-            int prox_na_pilha;
-            fread(&removido_flag, sizeof(char), 1, bin);
-            fread(&prox_na_pilha, sizeof(int), 1, bin);
+            Record *recordRemovido = record_read_from_file(bin);
+            int prox_na_pilha = record_get_proximo(recordRemovido);
         
             // Volta para a posição do registro e escreve o novo dado
-            fseek(bin, (topo), SEEK_SET);
+            fseek(bin, topo, SEEK_SET);
             record_write_to_file(bin, r);
 
             // Atualiza o topo do cabeçalho com o próximo da lista encadeada
-            int novo_topo_offset = (prox_na_pilha == -1) ? -1 : 17 + (prox_na_pilha * 80);
+            int novo_topo_offset = (prox_na_pilha == -1) ? -1 : prox_na_pilha;
             header_set_topo(h, novo_topo_offset);
+
+            free_record(&recordRemovido);
         }
         free_record(&r);
     }
@@ -390,7 +392,7 @@ void update_table(char *bin_filename){
     int n;
     scanf(" %d", &n);
     for(int i = 0; i < n; i++){
-        int m, p, quantRegistroEncontrado, posRecord, topoAntigo, proximoRRN;
+        int m, p, quantRegistroEncontrado, posRecord;
         scanf(" %d", &m);
         Criterio *criterios = input_criterios(m);
 

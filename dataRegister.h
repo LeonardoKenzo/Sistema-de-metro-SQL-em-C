@@ -26,6 +26,7 @@
 
     // Getters
     char record_get_removido(Record *r);
+    int record_get_proximo(Record *r);
     int record_get_codEstacao(Record *r);
     int record_get_codLinha(Record *r);
     int record_get_codProxEstacao(Record *r);

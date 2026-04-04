@@ -125,6 +125,10 @@ char record_get_removido(Record *r){
     return r->removido;    
 }
 
+int record_get_proximo(Record *r){
+    return r ? r->proximo : -1;
+}
+
 int record_get_codEstacao(Record *r) { 
     return r ? r->codEstacao : -1; 
 }
