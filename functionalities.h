@@ -12,5 +12,6 @@
     void search_table(char *bin_filename);
     void remove_record_table(char *bin_filename);
     void  insert_record_table(char *bin_filename);
+    void update_table(char *bin_filename);
 
 #endif

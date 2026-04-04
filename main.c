@@ -53,6 +53,10 @@ int main(void){
     }
     case 6:{
         // funcionalidade 6
+        char arq_bin[100];
+        scanf("%s", arq_bin);
+        update_table(arq_bin);
+        BinarioNaTela(arq_bin); 
         break;
     }
     }

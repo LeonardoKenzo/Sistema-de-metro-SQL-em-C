@@ -41,6 +41,7 @@ Criterio *input_criterios(int m);
 int *search_offset_records(FILE *bin, Criterio *criterios, int m, int *quantRecordEncontrados);
 Record **read_records_at_offset(FILE *bin, int *posOffsetRecords, int tamanhoPosOffset);
 void free_search_records(Record ***lista_records, int quantRecordEncontrados);
+void update_register(Record *r, Criterio *atualizar, int p);
 bool atende_criterios(Record *r, Criterio *criterios, int m);
 
 // Função auxiliar para ler inteiros que podem ser "NULO" da entrada padrão
@@ -148,7 +149,6 @@ void create_table(char *csv_filename, char *bin_filename){
     header_set_nroEstacoes(h, nroEstacoes);
     header_set_nroParesEst(h, nroPares);
 
-    fseek(bin, 0, SEEK_SET);
     header_write_to_file(bin, h);  
 
     free_lista_nomesEstacoes(&lista_nomesEstacoes, nroEstacoes);
@@ -287,7 +287,7 @@ void remove_record_table(char *bin_filename){
 
 // Funcionalidade 5 -----------------------------------
 
-void  insert_record_table(char *bin_filename){
+void insert_record_table(char *bin_filename){
     FILE *bin = fopen(bin_filename, "r+b");
     if(!bin || status_esta_instavel(bin)){
         printf("Falha no processamento do arquivo.\n"); 
@@ -364,6 +364,56 @@ void  insert_record_table(char *bin_filename){
     free_header_register(&h);
     fclose(bin);
 }
+
+// Funcionalidade 6 -------------------------------------------------------
+
+void update_table(char *bin_filename){
+    FILE *bin = fopen(bin_filename, "r+b");
+    if(!bin || status_esta_instavel(bin)){
+        printf("Falha no processamento do arquivo.\n");
+        if (bin) fclose(bin);
+        return;
+    }
+    // Marcar o header como instavel
+    Header *header = create_header_register();
+    header_read_from_file(bin, header);
+    header_set_status(header, '0');
+    header_write_to_file(bin, header);
+
+    int n;
+    scanf(" %d", &n);
+    for(int i = 0; i < n; i++){
+        int m, p, quantRegistroEncontrado, posRecord, topoAntigo, proximoRRN;
+        scanf(" %d", &m);
+        Criterio *criterios = input_criterios(m);
+
+        scanf(" %d", &p);
+        Criterio *atualizar = input_criterios(p);
+
+        // Todos os registros encontrados na busca
+        int *lista_posOffset_records = search_offset_records(bin, criterios, m, &quantRegistroEncontrado); // Filtra por criterio
+        Record **lista_records = read_records_at_offset(bin, lista_posOffset_records, quantRegistroEncontrado); // Carrega os registros
+        for(int j = 0; j < quantRegistroEncontrado; j++){
+            update_register(lista_records[j], atualizar, p);
+            
+            fseek(bin, lista_posOffset_records[j], SEEK_SET);
+            record_write_to_file(bin, lista_records[j]);
+        }
+
+        free(criterios);
+        free(atualizar);
+        free(lista_posOffset_records);
+        free_search_records(&lista_records, quantRegistroEncontrado);
+    }
+
+    // Marcar o header como estavel
+    header_set_status(header, '1');
+    header_write_to_file(bin, header);
+
+    free_header_register(&header);
+    fclose(bin);
+}
+
 
 
 // Funcoes auxiliares -----------------------------------------------------
@@ -630,22 +680,22 @@ bool atende_criterios(Record *r, Criterio *criterios, int m){
                 return false;
         } 
         else if (strncmp(criterios[i].nomeCampo, "codProxEstacao", 14) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "NULO") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
             if (record_get_codProxEstacao(r) != val) 
                 return false;
         } 
         else if (strncmp(criterios[i].nomeCampo, "distProxEstacao", 15) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "NULO") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
             if (record_get_distProxEstacao(r) != val) 
                 return false;
         } 
         else if (strncmp(criterios[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "NULO") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
             if (record_get_codLinhaIntegra(r) != val) 
                 return false;
         } 
         else if (strncmp(criterios[i].nomeCampo, "codEstIntegra", 13) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "NULO") == 0) ? -1 : atoi(criterios[i].valorCampo);
+            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
             if (record_get_codEstIntegra(r) != val) 
                 return false;
         } 
@@ -661,6 +711,39 @@ bool atende_criterios(Record *r, Criterio *criterios, int m){
         }
     }
     return true;
+}
+
+void update_register(Record *r, Criterio *atualizar, int p){
+    for(int i = 0; i < p; i++){
+        if (strncmp(atualizar[i].nomeCampo, "codEstacao", 10) == 0) {
+            record_set_codEstacao(r, atoi(atualizar[i].valorCampo));
+        } 
+        else if (strncmp(atualizar[i].nomeCampo, "codLinha", 8) == 0) {
+            record_set_codLinha(r, atoi(atualizar[i].valorCampo));
+        } 
+        else if (strncmp(atualizar[i].nomeCampo, "codProxEstacao", 14) == 0) {
+            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
+            record_set_codProxEstacao(r, val);
+        } 
+        else if (strncmp(atualizar[i].nomeCampo, "distProxEstacao", 15) == 0) {
+            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
+            record_set_distProxEstacao(r, val);
+        } 
+        else if (strncmp(atualizar[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
+            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
+            record_set_codLinhaIntegra(r, val);
+        } 
+        else if (strncmp(atualizar[i].nomeCampo, "codEstIntegra", 13) == 0) {
+            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
+            record_set_codEstIntegra(r, val);
+        } 
+        else if (strncmp(atualizar[i].nomeCampo, "nomeEstacao", 11) == 0) {
+            record_set_nomeEstacao(r, atualizar[i].valorCampo);
+        } 
+        else if (strncmp(atualizar[i].nomeCampo, "nomeLinha", 9) == 0) {
+            record_set_nomeLinha(r, atualizar[i].valorCampo);
+        }
+    }
 }
 
 int input_inteiro_ou_nulo() {
