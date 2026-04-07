@@ -27,8 +27,6 @@ bool esta_removido(FILE *bin, int posRecord);
 // Funcoes para buscar um registro a partir de criterios
 Criterio *input_criterios(int m);
 int *search_offset_records(FILE *bin, Criterio *criterios, int m, int *quantRecordEncontrados);
-Record **read_records_at_offset(FILE *bin, int *posOffsetRecords, int tamanhoPosOffset);
-void free_search_records(Record ***lista_records, int quantRecordEncontrados);
 void update_register(Record *r, Criterio *atualizar, int p);
 bool atende_criterios(Record *r, Criterio *criterios, int m);
 
@@ -187,9 +185,12 @@ void search_table(char *bin_filename){
 
         // Todos os registros encontrados na busca
         int *lista_posOffset_records = search_offset_records(bin, criterios, m, &quantRegistroEncontrado); // Filtra por criterio
-        Record **lista_records = read_records_at_offset(bin, lista_posOffset_records, quantRegistroEncontrado); // Carrega os registros
         for(int j = 0; j < quantRegistroEncontrado; j++){
-            printar_record_object(lista_records[j]);
+            Record *r = record_read_from_file_at_offset(bin, lista_posOffset_records[j]);
+
+            printar_record_object(r);
+            
+            free_record(&r);
         }
         if(quantRegistroEncontrado == 0){
             printf("Registro inexistente.\n");
@@ -199,7 +200,6 @@ void search_table(char *bin_filename){
 
         free(criterios);
         free(lista_posOffset_records);
-        free_search_records(&lista_records, quantRegistroEncontrado);
     }
 
     fclose(bin);
@@ -233,10 +233,9 @@ void remove_record_table(char *bin_filename){
 
         // Todos os registros encontrados na busca
         int *lista_posOffset_records = search_offset_records(bin, criterios, m, &quantRegistroEncontrado); // Filtra por criterio
-        Record **lista_records = read_records_at_offset(bin, lista_posOffset_records, quantRegistroEncontrado); // Carrega os registros
         for(int j = 0; j < quantRegistroEncontrado; j++){
 
-            Record *record = lista_records[j];
+            Record *record = record_read_from_file_at_offset(bin, lista_posOffset_records[j]);
             posRecord = lista_posOffset_records[j];
 
             // Remocao logica e atualizacao do header
@@ -252,11 +251,12 @@ void remove_record_table(char *bin_filename){
 
             header_set_topo(header, novoTopo);
             header_write_to_file(bin, header);
+
+            free_record(&record);
         }
         
         free(criterios);
         free(lista_posOffset_records);
-        free_search_records(&lista_records, quantRegistroEncontrado);
     }
 
     // Verifica a quantidade de nomes diferentes de estacoes e de pares de estacoes
@@ -401,18 +401,20 @@ void update_table(char *bin_filename){
 
         // Todos os registros encontrados na busca
         int *lista_posOffset_records = search_offset_records(bin, criterios, m, &quantRegistroEncontrado); // Filtra por criterio
-        Record **lista_records = read_records_at_offset(bin, lista_posOffset_records, quantRegistroEncontrado); // Carrega os registros
         for(int j = 0; j < quantRegistroEncontrado; j++){
-            update_register(lista_records[j], atualizar, p);
+            Record *record = record_read_from_file_at_offset(bin, lista_posOffset_records[j]);
+
+            update_register(record, atualizar, p);
             
             fseek(bin, lista_posOffset_records[j], SEEK_SET);
-            record_write_to_file(bin, lista_records[j]);
+            record_write_to_file(bin, record);
+
+            free_record(&record);
         }
 
         free(criterios);
         free(atualizar);
         free(lista_posOffset_records);
-        free_search_records(&lista_records, quantRegistroEncontrado);
     }
 
     // Marcar o header como estavel
@@ -559,40 +561,6 @@ void printar_record(FILE *bin, int posRecord){
         free_record(&r);        
     }
 }
-
-Record **read_records_at_offset(FILE *bin, int *posOffsetRecords, int tamanhoPosOffset){
-    Record **lista_records = (Record **)calloc(tamanhoPosOffset, sizeof(Record *));
-    if(!lista_records){
-        printf("Erro: alocação de memória busca de registros.\n");
-        return NULL;
-    }
-
-    Record *r;
-    for(int i = 0; i < tamanhoPosOffset; i++){
-        int posRecord = posOffsetRecords[i];
-        fseek(bin, posRecord, SEEK_SET);
-
-        r = record_read_from_file(bin);
-        if(r == NULL){
-            printf("Erro: alocação de memória ao criar registro de dados!.\n");
-            return NULL;
-        }
-
-        lista_records[i] = r;
-    }
-
-    return lista_records;
-}
-
-void free_search_records(Record ***lista_records, int quantRecordEncontrados){
-    if((*lista_records) == NULL)
-        return;
-    for(int i = 0; i < quantRecordEncontrados; i++){
-        free_record(&(*lista_records)[i]);
-    }
-    free((*lista_records));
-    *lista_records = NULL;
-}   
 
 int *search_offset_records(FILE *bin, Criterio *criterios, int m, int *quantRecordEncontrados){
     int quantRecords = 0, quantRecordsMax = 10;

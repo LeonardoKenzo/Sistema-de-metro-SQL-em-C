@@ -195,6 +195,11 @@ Record* record_read_from_file(FILE *fp){
     return r;
 }
 
+Record *record_read_from_file_at_offset(FILE *fp, int offset) {
+    fseek(fp, offset, SEEK_SET);
+    return record_read_from_file(fp);
+}
+
 void record_write_to_file(FILE *fp, Record *r) {
     // Escrita dos campos fixos
     fwrite(&r->removido, sizeof(char), 1, fp);

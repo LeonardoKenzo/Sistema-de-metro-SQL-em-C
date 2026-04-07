@@ -11,7 +11,8 @@ fornecidas.o:
 run:
 	./main
 clean:
-	rm *.o
-	rm *.exe
+	rm *.o *.exe *.zip main
 memory:
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -s ./main
+zip:
+	zip -r Trabalho-arquivo.zip *.c *.h makefile

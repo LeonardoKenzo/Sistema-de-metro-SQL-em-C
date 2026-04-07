@@ -38,6 +38,7 @@
     char* record_get_nomeLinha(Record *r);
 
     Record* record_read_from_file(FILE *fp);
+    Record* record_read_from_file_at_offset(FILE *fp, int offset);
 
     // Escrita campo a campo com preenchimento de lixo ($)
     void record_write_to_file(FILE *fp, Record *r);
