@@ -33,16 +33,16 @@
     // Funcoes para verificar o nroEstacoes e nroParEstacoes do header
     char **criar_lista_nomesEstacoes(int nroMaxEstacoes);
     bool tem_repetidos_nomesEstacoes(char **lista_nomesEstacoes, int nroEstacoes, char *nomeEst);
-    void achar_todos_nomesEstacoes(FILE *bin, char ***lista_nomesEstacoes, int *nroNomesEncontrados, int *nroMaxNomes);
     void adicionar_nomesEstacoes(char **lista_nomesEstacoes, int nroEstacoes, char *nomeEst);
     void aumentar_capacidade_nomesEstacoes(char ***lista_nomesEstacoes, int nroEstacoes, int nroMaxEstacoes);
     void free_lista_nomesEstacoes(char ***lista, int nroEstacoes);
 
     paresEstacoes *criar_lista_paresEstacoes(int nroMaxPares);
     bool tem_repetido_paresEstacoes(paresEstacoes *lista_paresEstacoes, int nroPares, int codEst, int codProx);
-    void achar_todos_paresEstacoes(FILE *bin, paresEstacoes **lista_paresEstacoes, int *nroParesEncontrados, int *nroMaxPares);
     void adicionar_paresEstacoes(paresEstacoes *lista_paresEstacoes, int nroPares, int codEst, int codProx);
     void aumentar_capacidade_paresEstacoes(paresEstacoes **lista_paresEstacoes, int nroPares, int nroMaxPares);
     void free_lista_paresEstacoes(paresEstacoes **lista);
+
+    void achar_todos_estacoes(FILE *bin, paresEstacoes **lista_paresEstacoes, int *nroParesEncontrados, int *nroMaxPares, char ***lista_nomesEstacoes, int *nroNomesEncontrados, int *nroMaxNomes);
 
 #endif
