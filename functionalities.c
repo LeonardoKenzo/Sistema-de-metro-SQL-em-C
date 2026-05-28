@@ -1,58 +1,23 @@
+#include "headerRegister.h"
+#include "dataRegister.h"
+#include "fornecidas.h"
 #include "functionalities.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "headerRegister.h"
-#include "dataRegister.h"
-#include "fornecidas.h"
 
-// Estrutura auxiliar para armazenar os criterios de busca
-typedef struct {
-    char nomeCampo[50];
-    char valorCampo[100];
-} Criterio;
-
-// Estrutura para armazenar o contexto de busca, como cada funcionalidade vai usar a busca
-typedef struct {
-    FILE *bin;
-    Header *header;
-
-    // coisas usadas em update
-    Criterio *atualizar;
-    int p;
-
-} Contexto;
-
-char* get_field(char **line);
-
-// Funcoes para ler um registro de um arquivo.bin
-int ler_campoFixo(FILE *bin, int posRecord, int posOffset);
-char *ler_campoVariavel(FILE *bin, int posRecord, int posOffset);
-void printar_record_object(Record *r);
-void printar_record(FILE *bin, int posRecord);
-void set_header_estacoes_unicas(FILE *bin, Header *h);
-bool status_esta_instavel(FILE *bin);
-bool esta_removido(FILE *bin, int posRecord);
-
-// Funcoes para buscar um registro a partir de criterios
-Criterio *input_criterios(int m);
-void update_campos(Record *r, Criterio *atualizar, int p);
-bool atende_criterios(Record *r, Criterio *criterios, int m);
-
-bool search_records(FILE *bin, Criterio *criterios, int m, void( *funcionalidade)(Record *r, int posRecord, Contexto *ctx), Contexto *ctx);
+// Funcoes para as funcionalidades 2, 4 e 6
 void print_register(Record *r, int posRecord, Contexto *ctx);
 void remove_register(Record *r, int posRecord, Contexto *ctx);
 void update_register(Record *r, int posRecord, Contexto *ctx);
 
-// Função auxiliar para ler inteiros que podem ser "NULO" da entrada padrão
-int input_inteiro_ou_nulo();
-
 // Funcionalidade 1 ------------------------------------------
 bool create_table(char *csv_filename, char *bin_filename){
     FILE *csv = fopen(csv_filename, "r");
-    FILE *bin = fopen(bin_filename, "w+b");
+    FILE *bin = fopen(bin_filename, "wb");
 
     if(!bin || !csv){
         printf("Falha no processamento do arquivo.\n");
@@ -62,6 +27,12 @@ bool create_table(char *csv_filename, char *bin_filename){
     // Criar e escrever cabeçalho inicial (status '0')
     Header *h = create_header_register();
     header_write_to_file(bin, h);
+
+    // Variaveis para controle de estacoes unicas e pares de estacoes
+    int nroMaxPares = 20, nroMaxNomes = 20, nroEstacoes = 0, nroPares = 0;
+    char **lista_nomesEstacoes = criar_lista_nomesEstacoes(nroMaxNomes);
+    paresEstacoes *lista_paresEstacoes = criar_lista_paresEstacoes(nroMaxPares);
+    
     
     char line[256];
     fgets(line, sizeof(line), csv); // Pular a primeira linha (cabeçalho CSV)
@@ -99,17 +70,43 @@ bool create_table(char *csv_filename, char *bin_filename){
         record_set_codEstIntegra(r, estIntegra);
         
         record_write_to_file(bin, r);
-        free_record(&r);
         
+        // Gerenciar listas de estações únicas e pares de estações para o header
+        char *nome = record_get_nomeEstacao(r);
+        
+        if(nroEstacoes >= nroMaxNomes){
+            nroMaxNomes *= 2;
+            aumentar_capacidade_nomesEstacoes(&lista_nomesEstacoes, nroEstacoes, nroMaxNomes);
+        }
+        if(nroPares >= nroMaxPares){
+            nroMaxPares *= 2;
+            aumentar_capacidade_paresEstacoes(&lista_paresEstacoes, nroPares, nroMaxPares);
+        }
+        
+        if(tem_repetidos_nomesEstacoes(lista_nomesEstacoes, nroEstacoes, nome) == false){
+            adicionar_nomesEstacoes(lista_nomesEstacoes, nroEstacoes, nome);
+            (nroEstacoes) += 1;
+        }
+        if(tem_repetido_paresEstacoes(lista_paresEstacoes, nroPares, codEst, codProx) == false && codProx != -1){
+            adicionar_paresEstacoes(lista_paresEstacoes, nroPares, codEst, codProx);
+            (nroPares) += 1;
+        }
+        
+        free_record(&r);
         rrn_count++;
     }
     header_set_proxRRN(h, rrn_count);
 
-    set_header_estacoes_unicas(bin, h);
+    // Atualiza o header com os valores corretos
+    header_set_nroEstacoes(h, nroEstacoes);
+    header_set_nroParesEst(h, nroPares);
     header_set_status(h, '1');
     header_write_to_file(bin, h);  
-
+    
+    // Libera memória e fecha arquivos
     free_header_register(&h);
+    free_lista_paresEstacoes(&lista_paresEstacoes);
+    free_lista_nomesEstacoes(&lista_nomesEstacoes, nroEstacoes);
     fclose(csv);
     fclose(bin);
     return true;
@@ -129,15 +126,32 @@ void print_table(char *bin_filename){
 
     bool encontrou = false;
     Record *r;
-    while((r = record_read_from_file(bin)) != NULL){
-
-        if (record_get_removido(r) == '1'){
-            free_record(&r);
+    char removido;
+    int RRN = 0, posRecord = 0;
+    while(fread(&removido, sizeof(char), 1, bin) == 1){
+        if(removido == '1'){
+            RRN++;
+            posRecord = 17 + RRN * 80;
+            fseek(bin, posRecord, SEEK_SET);
             continue;
         }
+
+        posRecord = 17 + RRN * 80;
+        fseek(bin, posRecord, SEEK_SET);
+
+        r = record_read_from_file(bin);
+        if(r == NULL) {
+            RRN++;
+            continue;
+        }
+        
         printar_record_object(r);
         encontrou = true;
-        
+
+        RRN++;
+        posRecord = 17 + RRN * 80;
+        fseek(bin, posRecord, SEEK_SET);
+
         free_record(&r);
     }
 
@@ -193,9 +207,7 @@ void remove_record_table(char *bin_filename){
     header_write_to_file(bin, header);
     
     // Cria o contexto da remocao
-    Contexto *ctx = malloc(sizeof(Contexto));
-    ctx->bin = bin;
-    ctx->header = header;
+    Contexto *ctx = criar_contexto(bin, header, NULL, 0);
 
     int n;
     scanf(" %d", &n);
@@ -319,9 +331,7 @@ void update_table(char *bin_filename){
     header_set_status(header, '0');
     header_write_to_file(bin, header);
 
-    Contexto *ctx = malloc(sizeof(Contexto));
-    ctx->bin = bin;
-    ctx->header = header;
+    Contexto *ctx = criar_contexto(bin, header, NULL, 0);
 
     int n;
     scanf(" %d", &n);
@@ -332,8 +342,7 @@ void update_table(char *bin_filename){
 
         scanf(" %d", &p);
         Criterio *atualizar = input_criterios(p);
-        ctx->p = p;
-        ctx->atualizar = atualizar;
+        atualizar_contexto(ctx, atualizar, p);
 
         // Filtra por criterio, atualiza os encontrados e escreve de volta no arquivo
         search_records(bin, criterios, m, update_register, ctx);
@@ -353,309 +362,27 @@ void update_table(char *bin_filename){
 
 // Funcoes auxiliares -----------------------------------------------------
 
-// Função auxiliar para ler campos do CSV tratando nulos
-char* get_field(char **line) {
-    char *start = *line;
-    char *end = strchr(start, ',');
-    if (end) {
-        *end = '\0';
-        *line = end + 1;
-    } else {
-        // Último campo da linha (que termina em \n ou \r)
-        char *newline = strpbrk(start, "\n\r");
-        if (newline) *newline = '\0';
-        *line = start + strlen(start);
-    }
-    return start;
-}
-
-bool status_esta_instavel(FILE *bin){
-    char status;
-    fread(&status, sizeof(char), 1, bin);
-
-    if(status == '0'){
-        return true;
-    }
-
-    return false;
-}
-
-// Funcao auxiliar para ler os campos variaveis dos records do file BIN 
-// (lembre-se de dar free no campo depois e usar o posOffset do tamanho do campo)
-char *ler_campoVariavel(FILE *bin, int posRecord, int posOffset){
-    fseek(bin, posRecord + posOffset, SEEK_SET);
-
-    int tamNome;
-    fread(&tamNome, sizeof(int), 1, bin);
-    
-    if(tamNome > 0){
-        char *nome = (char *)malloc((tamNome + 1)* sizeof(char));
-        fread(nome, sizeof(char), tamNome, bin);
-        nome[tamNome] = '\0';
-
-        return nome;
-    }
-
-    return NULL;
-}
-
-int ler_campoFixo(FILE *bin, int posRecord, int posOffset){
-    fseek(bin, posRecord + posOffset, SEEK_SET);
-
-    int campoFixo;
-    fread(&campoFixo, sizeof(int), 1, bin);
-
-    return campoFixo;
-}
-
-bool esta_removido(FILE *bin, int posRecord){
-    fseek(bin, posRecord, SEEK_SET);
-
-    char removido;
-    fread(&removido, sizeof(char), 1, bin);
-
-    if(removido == '1')
-        return true;
-
-    return false;
-}
-
-// Auxiliar para imprimir inteiros tratando o valor -1 como NULO
-void print_int_or_nulo(int valor) {
-    if (valor == -1) {
-        printf("NULO");
-    } else {
-        printf("%d", valor);
-    }
-}
-
-// Auxiliar para imprimir strings tratando o ponteiro NULL como NULO
-void print_str_or_nulo(char *str) {
-    if (str == NULL || strlen(str) == 0) {
-        printf("NULO");
-    } else {
-        printf("%s", str);
-    }
-}
-
-void printar_record_object(Record *r) {
-    if (r == NULL) return;
-
-    // codEstacao (Nunca é nulo conforme especificação)
-    printf("%d ", record_get_codEstacao(r));
-
-    // nomeEstacao (Nunca é nulo conforme especificação)
-    printf("%s ", record_get_nomeEstacao(r));
-
-    // codLinha
-    print_int_or_nulo(record_get_codLinha(r));
-    printf(" ");
-
-    // nomeLinha
-    print_str_or_nulo(record_get_nomeLinha(r));
-    printf(" ");
-
-    // codProxEstacao
-    print_int_or_nulo(record_get_codProxEstacao(r));
-    printf(" ");
-
-    // distProxEstacao
-    print_int_or_nulo(record_get_distProxEstacao(r));
-    printf(" ");
-
-    // codLinhaIntegra
-    print_int_or_nulo(record_get_codLinhaIntegra(r));
-    printf(" ");
-
-    // codEstIntegra
-    print_int_or_nulo(record_get_codEstIntegra(r));
-
-    // Quebra de linha final para o registro
-    printf("\n");
-}
-
-void printar_record(FILE *bin, int posRecord){
-    fseek(bin, posRecord, SEEK_SET);
-    
-    // Em vez de dar printf campo a campo
-    Record *r = record_read_from_file(bin); // Lê e cria o objeto
-    
-    if (r != NULL) {
-        printar_record_object(r); // Usa a lógica centralizada de exibição
-        free_record(&r);        
-    }
-}
-
-/* Caso queira adicionar funcionalidades novas pode usar a função search_records passando uma função
-pointer para a funcionalidade e um contexto com as informações necessárias para cada funcionalidade.
-*/
-bool search_records(FILE *bin, Criterio *criterios, int m, void(*funcionalidade)(Record *r, int posRecord, Contexto *ctx), Contexto *ctx){
-    bool encontrou = false;
-   
-    fseek(bin, 17, SEEK_SET); // Posiciona o cursor no primeiro registro
-
-    // Percorre os registros do arquivo  
-    int RRN = 0, posRecord = 0;
-    Record *r;
-    while((r = record_read_from_file(bin)) != NULL){
-        posRecord = 17 + RRN * 80;
-
-        // Verifica se o registro foi removido
-        if (record_get_removido(r) == '1'){
-            free_record(&r);
-            RRN++;
-            continue;
-        }
-
-        // Verifica se o registro atende aos criterios de busca e executa a acao dependendo da funcionalidade 
-        if(atende_criterios(r, criterios, m)){
-            encontrou = true;
-            funcionalidade(r, posRecord, ctx); // Executa a funcionalidade passada
-        }
-        
-        RRN++;
-
-        // Garante que esteja lendo corretamente o arquivo
-        posRecord = 17 + RRN * 80;
-        fseek(bin, posRecord, SEEK_SET);
-
-        free_record(&r);
-    }
-
-    return encontrou;
-}
-
 void print_register(Record *r, int posRecord, Contexto *ctx){
     printar_record_object(r);
 }
 
 void remove_register(Record *r, int posRecord, Contexto *ctx){
-    int topoAntigo = header_get_topo(ctx->header);
+    int topoAntigo = header_get_topo(get_header_from_context(ctx));
     int proximoRRN = topoAntigo;
     int novoTopo = (posRecord - 17) / 80;
     
     record_set_removido(r, '1');
     record_set_proximo(r, proximoRRN);
     
-    fseek(ctx->bin, posRecord, SEEK_SET);
-    record_write_to_file(ctx->bin, r);
+    fseek(get_file_from_context(ctx), posRecord, SEEK_SET);
+    record_write_to_file(get_file_from_context(ctx), r);
 
-    header_set_topo(ctx->header, novoTopo);
+    header_set_topo(get_header_from_context(ctx), novoTopo);
 }
 
 void update_register(Record *r, int posRecord, Contexto *ctx){
-    update_campos(r, ctx->atualizar, ctx->p);
+    update_campos(r, get_atualizar_from_context(ctx), get_p_from_context(ctx));
     
-    fseek(ctx->bin, posRecord, SEEK_SET);
-    record_write_to_file(ctx->bin, r);
-}
-
-Criterio *input_criterios(int m){
-    Criterio *criterios = malloc(sizeof(Criterio) * m);
-        
-    for(int j = 0; j < m; j++){
-        scanf("%s", criterios[j].nomeCampo);
-        // scan_quote_string lida com aspas em strings
-        ScanQuoteString(criterios[j].valorCampo); 
-    }
-
-    return criterios;
-}
-
-bool atende_criterios(Record *r, Criterio *criterios, int m){
-    for(int i = 0; i < m; i++){
-        if (strncmp(criterios[i].nomeCampo, "codEstacao", 10) == 0) {
-            if (record_get_codEstacao(r) != atoi(criterios[i].valorCampo))
-                return false;
-        } 
-        else if (strncmp(criterios[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
-            if (record_get_codLinhaIntegra(r) != val) 
-                return false;
-        } 
-        else if (strncmp(criterios[i].nomeCampo, "codLinha", 8) == 0) {
-            if (record_get_codLinha(r) != atoi(criterios[i].valorCampo)) 
-                return false;
-        } 
-        else if (strncmp(criterios[i].nomeCampo, "codProxEstacao", 14) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
-            if (record_get_codProxEstacao(r) != val) 
-                return false;
-        } 
-        else if (strncmp(criterios[i].nomeCampo, "distProxEstacao", 15) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
-            if (record_get_distProxEstacao(r) != val) 
-                return false;
-        } 
-        else if (strncmp(criterios[i].nomeCampo, "codEstIntegra", 13) == 0) {
-            int val = (strcmp(criterios[i].valorCampo, "") == 0) ? -1 : atoi(criterios[i].valorCampo);
-            if (record_get_codEstIntegra(r) != val) 
-                return false;
-        } 
-        else if (strncmp(criterios[i].nomeCampo, "nomeEstacao", 11) == 0) {
-            char *nome = record_get_nomeEstacao(r);
-            if (nome == NULL || strcmp(nome, criterios[i].valorCampo) != 0) 
-                return false;
-        } 
-        else if (strncmp(criterios[i].nomeCampo, "nomeLinha", 9) == 0) {
-            char *nome = record_get_nomeLinha(r);
-            if (nome == NULL || strcmp(nome, criterios[i].valorCampo) != 0)     
-                return false;
-        }
-    }
-    return true;
-}
-
-void update_campos(Record *r, Criterio *atualizar, int p){
-    for(int i = 0; i < p; i++){
-        if (strncmp(atualizar[i].nomeCampo, "codEstacao", 10) == 0) {
-            record_set_codEstacao(r, atoi(atualizar[i].valorCampo));
-        } 
-        else if (strncmp(atualizar[i].nomeCampo, "codLinhaIntegra", 15) == 0) {
-            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
-            record_set_codLinhaIntegra(r, val);
-        } 
-        else if (strncmp(atualizar[i].nomeCampo, "codLinha", 8) == 0) {
-            record_set_codLinha(r, atoi(atualizar[i].valorCampo));
-        } 
-        else if (strncmp(atualizar[i].nomeCampo, "codProxEstacao", 14) == 0) {
-            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
-            record_set_codProxEstacao(r, val);
-        } 
-        else if (strncmp(atualizar[i].nomeCampo, "distProxEstacao", 15) == 0) {
-            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
-            record_set_distProxEstacao(r, val);
-        } 
-        else if (strncmp(atualizar[i].nomeCampo, "codEstIntegra", 13) == 0) {
-            int val = (strcmp(atualizar[i].valorCampo, "") == 0) ? -1 : atoi(atualizar[i].valorCampo);
-            record_set_codEstIntegra(r, val);
-        } 
-        else if (strncmp(atualizar[i].nomeCampo, "nomeEstacao", 11) == 0) {
-            record_set_nomeEstacao(r, atualizar[i].valorCampo);
-        } 
-        else if (strncmp(atualizar[i].nomeCampo, "nomeLinha", 9) == 0) {
-            record_set_nomeLinha(r, atualizar[i].valorCampo);
-        }
-    }
-}
-
-int input_inteiro_ou_nulo() {
-    char buffer[20];
-    if (scanf("%s", buffer) != 1) return -1;
-    if (strcmp(buffer, "NULO") == 0) return -1;
-    return atoi(buffer);
-}
-
-void set_header_estacoes_unicas(FILE *bin, Header *h){
-    int nroMaxPares = header_get_proxRRN(h), nroMaxNomes = header_get_proxRRN(h), nroEstacoes = 0, nroPares = 0;
-    char **lista_nomesEstacoes = criar_lista_nomesEstacoes(nroMaxNomes);
-    paresEstacoes *lista_paresEstacoes = criar_lista_paresEstacoes(nroMaxPares);
-
-    achar_todos_estacoes(bin, &lista_paresEstacoes, &nroPares, &nroMaxPares, &lista_nomesEstacoes, &nroEstacoes, &nroMaxNomes);
-    
-    header_set_nroEstacoes(h, nroEstacoes);
-    header_set_nroParesEst(h, nroPares);
-
-    free_lista_nomesEstacoes(&lista_nomesEstacoes, nroEstacoes);
-    free_lista_paresEstacoes(&lista_paresEstacoes);
+    fseek(get_file_from_context(ctx), posRecord, SEEK_SET);
+    record_write_to_file(get_file_from_context(ctx), r);
 }

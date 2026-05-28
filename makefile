@@ -1,5 +1,5 @@
-all: dataRegister.o functionalities.o headerRegister.o fornecidas.o main.c
-	gcc dataRegister.o functionalities.o headerRegister.o fornecidas.o main.c -o main -std=c99 -Wall -lm
+all: dataRegister.o functionalities.o headerRegister.o fornecidas.o utils.o main.c
+	gcc dataRegister.o functionalities.o headerRegister.o fornecidas.o utils.o main.c -o main -std=c99 -Wall -lm
 dataRegister.o:
 	gcc -c dataRegister.c -o dataRegister.o
 functionalities.o:
@@ -8,6 +8,8 @@ headerRegister.o:
 	gcc -c headerRegister.c -o headerRegister.o
 fornecidas.o:
 	gcc -c fornecidas.c -o fornecidas.o
+utils.o:
+	gcc -c utils.c -o utils.o
 run:
 	./main
 clean:
