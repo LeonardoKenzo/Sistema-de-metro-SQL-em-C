@@ -20,10 +20,17 @@ struct Contextos{
     // coisas usadas em update
     Criterio *atualizar;
     int p;
+
+    // para pausar a busca apos encontrar um registro
+    bool pararBusca;
 };
 
 // Procura por registros que atendem aos criterios e executa a funcionalidade passada como parametro
 bool search_records(FILE *bin, Criterio *criterios, int m, void(*funcionalidade)(Record *r, int posRecord, Contexto *ctx), Contexto *ctx){
+    if(ctx == NULL){
+        ctx = criar_contexto(bin, NULL, NULL, 0);
+    }
+
     bool encontrou = false;
    
     fseek(bin, 17, SEEK_SET); // Posiciona o cursor no primeiro registro
@@ -33,7 +40,7 @@ bool search_records(FILE *bin, Criterio *criterios, int m, void(*funcionalidade)
     Record *r;
     char removido;
 
-    while(fread(&removido, sizeof(char), 1, bin) == 1){
+    while(fread(&removido, sizeof(char), 1, bin) == 1 && ctx->pararBusca == false){
         posRecord = 17 + RRN * 80;
         
         // Se estiver removido, pula para o próximo
@@ -328,12 +335,18 @@ Contexto *criar_contexto(FILE *bin, Header *header, Criterio *atualizar, int p){
     ctx->header = header;
     ctx->atualizar = atualizar;
     ctx->p = p;
+    ctx->pararBusca = false;
     return ctx;
 }
 
 Contexto *atualizar_contexto(Contexto *ctx, Criterio *atualizar, int p) {
     ctx->atualizar = atualizar;
     ctx->p = p;
+    return ctx;
+}
+
+Contexto *pausar_busca(Contexto *ctx) {
+    ctx->pararBusca = true;
     return ctx;
 }
 

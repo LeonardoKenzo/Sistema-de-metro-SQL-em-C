@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "headerRegister.h"
-#include "dataRegister.h"
 #include "functionalities.h"
+#include "BTree.h"
 #include "fornecidas.h"
 
+
+// Leonardo Kenzo Tanaka - 16882154
+// Pedro Teidi de Sa Yamacita - 16897290
 
 int main(void){
     
@@ -60,6 +62,39 @@ int main(void){
         BinarioNaTela(arq_bin); 
         break;
     }
+    case 7:{
+        // funcionalidade 7
+        char arq_bin[100], arq_btree[100];
+        scanf("%s %s", arq_bin, arq_btree);
+        create_btree(arq_bin, arq_btree);
+        binarioNaTela(arq_btree);
+        break;
     }
+    case 8:{
+        // funcionalidade 8
+        char arq_bin[100], arq_btree[100];
+        scanf("%s %s", arq_bin, arq_btree);
+        search_btree(arq_bin, arq_btree);
+        break;
+    }
+    case 9:{
+        // funcionalidade 9
+        char arq_bin[100], arq_btree[100];
+        scanf("%s %s", arq_bin, arq_btree);
+        insert_btree(arq_bin, arq_btree);
+        BinarioNaTela(arq_bin);
+        BinarioNaTela(arq_btree);
+        break;
+    }
+    case 10:{
+        // funcionalidade 10
+        char arq_bin[100], arq_btree[100];
+        scanf("%s %s", arq_bin, arq_btree);
+        remove_btree(arq_bin, arq_btree);
+        binarioNaTela(arq_bin);
+        binarioNaTela(arq_btree);
+        break;
+    }
+    }   
     return 0;
 }

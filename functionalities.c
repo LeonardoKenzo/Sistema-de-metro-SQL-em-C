@@ -177,7 +177,7 @@ void search_table(char *bin_filename){
         int m;
         scanf(" %d", &m);
         Criterio *criterios = input_criterios(m);
-
+        
         // Filtra por criterio e imprime os encontrados
         bool encontrou = search_records(bin, criterios, m, print_register, NULL); 
         
@@ -385,4 +385,5 @@ void update_register(Record *r, int posRecord, Contexto *ctx){
     
     fseek(get_file_from_context(ctx), posRecord, SEEK_SET);
     record_write_to_file(get_file_from_context(ctx), r);
+    pausar_busca(ctx);
 }

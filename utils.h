@@ -32,6 +32,7 @@
 
     Contexto *criar_contexto(FILE *bin, Header *header, Criterio *atualizar, int p);
     Contexto *atualizar_contexto(Contexto *ctx, Criterio *atualizar, int p);
+    Contexto *pausar_busca(Contexto *ctx);
     FILE *get_file_from_context(Contexto *ctx);
     Criterio *get_atualizar_from_context(Contexto *ctx);
     Header *get_header_from_context(Contexto *ctx);
