@@ -11,7 +11,7 @@
 
     // funcoes
     int btree_node_buscar_chave(NodeB *node, int chave);
-    bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro);
+    bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filho);
     bool btree_node_remover_chave(NodeB *node, int chave);
     
     // getters
@@ -25,6 +25,7 @@
     void btree_node_set_proximo(NodeB *node, int proximo);
     void btree_node_set_tipoNo(NodeB *node, int tipoNo);
     void btree_node_set_nroChaves(NodeB *node, int nroChaves);
+    void bree_node_set_filho_inicial(NodeB *node, int filho);
 
     // I/O - Escrita campo a campo
     void btree_node_write_to_file(FILE *fp, NodeB *node);

@@ -84,6 +84,11 @@ void btree_node_set_nroChaves(NodeB *node, int nroChaves){
     else printf("Erro: nó nulo (BTreeNode)!\n");
 }
 
+void bree_node_set_filho_inicial(NodeB *node, int filho){
+    if(node) node->ponteiros[0] = filho;
+    else printf("Erro: nó nulo (BTreeNode)!\n");
+}
+
 int btree_node_buscar_chave(NodeB *node, int chave){
     if(node == NULL){
         printf("Erro: nó nulo (BTreeNode)!\n");
@@ -99,7 +104,7 @@ int btree_node_buscar_chave(NodeB *node, int chave){
     return -1;
 }
 
-bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro){
+bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filho){
     if(node == NULL){
         printf("Erro: nó nulo (BTreeNode)!\n");
         return false;
@@ -116,14 +121,16 @@ bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro){
     }
     
     // Insere a chave e o ponteiro ordenadamente shiftando as chaves maiores para a direita
-    if(node->nroChaves < 3){
+    if(node->nroChaves < MAX_CHAVES){
         int i = node->nroChaves - 1;
         while(i >= 0 && node->chaves[i].chave > chave){
             node->chaves[i + 1] = node->chaves[i];
+            node->ponteiros[i + 2] = node->ponteiros[i + 1];
             i--;
         }
         node->chaves[i + 1].chave = chave;
         node->chaves[i + 1].ponteiro = ponteiro;
+        node->ponteiros[i + 2] = filho;
     } 
     else {
         return false;
@@ -133,6 +140,7 @@ bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro){
     return true;
 }
 
+// Corrigir com taxa de ocupação m/2 - 1
 bool btree_node_remover_chave(NodeB *node, int chave){
     if(node == NULL){
         printf("Erro: nó nulo (BTreeNode)!\n");
@@ -160,8 +168,10 @@ bool btree_node_remover_chave(NodeB *node, int chave){
 
     for(int j = i; j < node->nroChaves - 1; j++){
         node->chaves[j] = node->chaves[j + 1];
+        node->ponteiros[j + 1] = node->ponteiros[j + 2];
     }
     node->chaves[node->nroChaves - 1] = (ParNo){-1, -1};
+    node->ponteiros[node->nroChaves] = -1;
     node->nroChaves--;
     return true;
 }

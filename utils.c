@@ -314,6 +314,7 @@ int input_inteiro_ou_nulo() {
     return atoi(buffer);
 }
 
+// Manipulação do contexto da busca dos registros de dados do arquivo binário
 Criterio *input_criterios(int m){
     Criterio *criterios = malloc(sizeof(Criterio) * m);
         
