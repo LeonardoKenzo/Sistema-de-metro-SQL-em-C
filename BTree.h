@@ -11,4 +11,7 @@
     void insert_btree(char *bin_filename, char *btree_filename);
     void remove_btree(char *bin_filename, char *btree_filename);
     
+
+    int btree_search_recursive(FILE *btree, int rrn, int chave_busca);
+    
 #endif

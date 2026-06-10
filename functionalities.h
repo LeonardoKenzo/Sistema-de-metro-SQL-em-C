@@ -7,6 +7,8 @@
     #include <ctype.h>
     #include "headerRegister.h"
     #include "dataRegister.h"
+    #include "BTree.h"      
+    #include "BTreeHeader.h"
 
     bool create_table(char *csv_filename,char *bin_filename);
     void print_table(char *bin_filename);
@@ -15,4 +17,5 @@
     void  insert_record_table(char *bin_filename);
     void update_table(char *bin_filename);
 
+    void search_btree_table(char *bin_filename, char *btree_filename);
 #endif

@@ -367,3 +367,12 @@ int get_p_from_context(Contexto *ctx) {
     return ctx->p;
 }
 
+// Verifica se o 'codEstacao' foi fornecido e retorna seu valor. Retorna -1 se não existir.
+int get_chave_busca_criterio(Criterio *criterios, int m) {
+    for(int i = 0; i < m; i++){
+        if (strncmp(criterios[i].nomeCampo, "codEstacao", 10) == 0) {
+            return atoi(criterios[i].valorCampo);
+        }
+    }
+    return -1;
+}

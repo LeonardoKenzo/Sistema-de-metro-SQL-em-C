@@ -87,3 +87,31 @@ int busca_binaria(NodeB *no, int chave){
     }
     
 }
+
+int btree_search_recursive(FILE *btree, int rrn, int chave_busca){
+    if(rrn == -1) return -1;
+
+    int byteOffset = 17 + rrn * 53;
+    NodeB *node = btree_node_read_from_file_at_offset(btree, byteOffset);
+    if (node == NULL) return -1;
+
+    // Verifica se a chave está neste nó
+    int ponteiro_dados = btree_node_buscar_chave(node, chave_busca);
+    if (ponteiro_dados != -1) {
+        free_btree_node(&node);
+        return ponteiro_dados; // retorna o offset no arquivo de dados
+    }
+    
+    // Se for folha e não achou, a chave não existe na árvore
+    if (btree_node_get_tipoNo(node) == -1) {
+        free_btree_node(&node);
+        return -1;
+    }
+
+    // Caso não seja folha, encontra o filho correto e continua a busca
+    int filho_rrn = btree_node_get_child_rrn(node, chave_busca);
+    free_btree_node(&node);
+
+    return btree_search_recursive(btree, filho_rrn, chave_busca);
+
+}

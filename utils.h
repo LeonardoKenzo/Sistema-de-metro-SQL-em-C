@@ -40,6 +40,10 @@
     Contexto *criar_contexto(FILE *bin, Header *header, Criterio *atualizar, int p);
     Contexto *atualizar_contexto(Contexto *ctx, Criterio *atualizar, int p);
     Contexto *pausar_busca(Contexto *ctx);
+
+    // Verifica se 'codEstacao' foi fornecido como criterio de busca
+    int get_chave_busca_criterio(Criterio *criterios, int m);
+    
     // getters do contexto
     FILE *get_file_from_context(Contexto *ctx);
     Criterio *get_atualizar_from_context(Contexto *ctx);

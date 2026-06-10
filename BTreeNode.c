@@ -235,3 +235,14 @@ void free_btree_node(NodeB **node){
     free(*node);
     *node = NULL;
 }
+
+int btree_node_get_child_rrn(NodeB *node, int chave) {
+    if(node == NULL) return -1;
+    int i;
+    for (i = 0; i < node->nroChaves; i++) {
+        if (chave < node->chaves[i].chave) {
+            break;
+        }
+    }
+    return node->ponteiros[i];
+}

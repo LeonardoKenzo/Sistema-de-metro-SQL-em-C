@@ -3,6 +3,8 @@
 #include "fornecidas.h"
 #include "functionalities.h"
 #include "utils.h"
+#include "BTree.h"       
+#include "BTreeHeader.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -359,6 +361,96 @@ void update_table(char *bin_filename){
     free(ctx);
     fclose(bin);
 }
+
+
+
+
+
+// Funcionalidade 8
+void search_btree(char *bin_filename, char *btree_filename){
+    FILE *bin = fopen(bin_filename, "rb");
+    FILE *btree = fopen(btree_filename, "rb");
+
+    HeaderBTree *headerBtree = NULL;
+    bool flag_estavel = true;
+
+    // Verificações
+    if(!bin || ! btree){
+        flag_estavel = false;
+    }
+    else{
+        if(status_esta_instavel(bin)) flag_estavel = false;
+
+        headerBtree = create_btree_header();
+        btree_header_read_from_file(btree, headerBtree);
+        if(btree_header_get_status(headerBtree) == '0') flag_estavel = false;
+    }
+    
+    if(!flag_estavel){
+        printf("Falha no processamento do arquivo.\n");
+        if(bin) fclose(bin);
+        if(btree) fclose(btree);
+        if(headerBtree) free_btree_header(&headerBtree);
+        return;
+    }
+
+
+    int noRaiz = btree_header_get_noRaiz(headerBtree);
+
+    int n;
+    if(scanf(" %d", &n) != 1) return;
+
+    for(int i = 0; i < n; i++){
+        int m;
+        scanf(" %d", &m);
+        Criterio *criterios = input_criterios(m);
+
+        // Verificar qual mecanismo de busca usar
+        int chave_busca = get_chave_busca_criterio(criterios, m);
+
+        bool encontrou = false;
+
+        if(chave_busca != -1){
+            // Caso codEstação seja criterio de busca, usa-se busca na arvore
+            int offset_dados = btree_search_recursive(btree, noRaiz, chave_busca);
+
+            if (offset_dados != -1) {
+                fseek(bin, offset_dados, SEEK_SET);
+                Record *r = record_read_from_file(bin);
+                // a Arvore devolve o registro, precisa ver se nao esta removido logicamente
+                if(r != NULL){
+                    if(record_get_removido(r) == '0' && atende_criterios(r, criterios, m)){
+                        print_register(r, offset_dados, NULL); // Imprime formatado
+                        encontrou = true;
+                    }
+                    free_record(&r);
+                }
+            }
+        }
+        else{
+            encontrou = search_records(bin, criterios, m, print_register, NULL);
+        }
+        if (!encontrou)
+        {
+            printf("Registro inexistente.\n");
+        }
+        printf("\n"); 
+
+        free(criterios);
+    }
+    free_btree_header(&headerBtree);
+    fclose(bin);
+    fclose(btree);
+}
+
+
+
+
+
+
+
+
+
 
 // Funcoes auxiliares -----------------------------------------------------
 
