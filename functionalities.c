@@ -301,7 +301,7 @@ void insert_record_table(char *bin_filename){
             record_write_to_file(bin, r);
 
             // Atualiza o topo do cabeçalho com o próximo da lista encadeada
-            int novo_topo_offset = (prox_na_pilha == -1) ? -1 : prox_na_pilha;
+            int novo_topo_offset = (prox_na_pilha == -1) ? -1 : prox_na_pilha; // Não é só colocar prox_na_pilha?
             header_set_topo(h, novo_topo_offset);
 
             free_record(&recordRemovido);
@@ -362,11 +362,76 @@ void update_table(char *bin_filename){
     fclose(bin);
 }
 
+// Funcionalidade 7 --------------------------------------------------
+
+bool create_btree(char *bin_filename, char *btree_filename){
+    FILE *bin = fopen(bin_filename, "r");
+    FILE *btree = fopen(btree_filename, "wb");
+    
+    if(!bin || !btree || status_esta_instavel(bin)){
+        printf("Falha no processamento do arquivo.\n");
+        return false;
+    }
+
+    HeaderBTree *headerB = create_btree_header();
+    btree_header_write_to_file(btree, headerB);
+
+    Record *record;
+    NodeB *no;
+    char removido;
+    int RRN = 0, posRecord = 0, RRNNo = -1;
+    btree_header_set_noRaiz(headerB, RRNNo);
+
+    // Percorre todo o arquivo binario para criar o indice de arvore B
+    fseek(bin, 17, SEEK_SET);
+    while(fread(&removido, sizeof(char), 1, bin) == 1){
+
+        // Ignora os registros removidos
+        if(removido == '1'){
+            RRN++;
+            posRecord = 17 + RRN * 80;
+            fseek(bin, posRecord, SEEK_SET);
+            continue;
+        }   
+
+        // Pega a chave primária e o posOffset do registro encontrado
+        posRecord = 17 + RRN * 80;
+        fseek(bin, posRecord, SEEK_SET);
+        record = record_read_from_file(bin);
+        int chave = record_get_codEstacao(record);
+
+        // Criação da arvore b -------------------------------------
+        
+        // Se não tiver nenhum no da arvore, cria o primeiro no raiz
+        if(RRNNo == -1){
+            RRNNo++;
+            no = create_btree_node(-1);
+            btree_header_set_noRaiz(headerB, RRNNo);
+        }
+        else {
+            // Pega o no raiz pelo RRN do noRaiz
+            int posOffsetNo = 17 + 53 * btree_header_get_noRaiz(headerB);
+            no = btree_node_read_from_file_at_offset(btree, posOffsetNo);
+        }
 
 
+        RRN++;
 
+        free_btree_node(&no);
+        free_record(&record);
+    }
 
-// Funcionalidade 8
+    
+    btree_header_set_status(headerB, '1');
+    btree_header_write_to_file(btree, headerB);
+    free_btree_header(headerB);
+
+    fclose(bin);
+    fclose(btree);
+}
+
+// Funcionalidade 8 --------------------------------------------------
+
 void search_btree(char *bin_filename, char *btree_filename){
     FILE *bin = fopen(bin_filename, "rb");
     FILE *btree = fopen(btree_filename, "rb");
@@ -412,9 +477,12 @@ void search_btree(char *bin_filename, char *btree_filename){
 
         if(chave_busca != -1){
             // Caso codEstação seja criterio de busca, usa-se busca na arvore
-            int offset_dados = btree_search_recursive(btree, noRaiz, chave_busca);
+            NodeSearch *nodeFound = btree_search_recursive(btree, noRaiz, -1, chave_busca);
+            int rrn = btree_nodeSearch_get_rrn(nodeFound);
 
-            if (offset_dados != -1) {
+            if (rrn != -1) {
+                int offset_dados = 17 + rrn * 53;
+
                 fseek(bin, offset_dados, SEEK_SET);
                 Record *r = record_read_from_file(bin);
                 // a Arvore devolve o registro, precisa ver se nao esta removido logicamente
@@ -426,6 +494,7 @@ void search_btree(char *bin_filename, char *btree_filename){
                     free_record(&r);
                 }
             }
+            free_search_result(&nodeFound);
         }
         else{
             encontrou = search_records(bin, criterios, m, print_register, NULL);
@@ -447,10 +516,73 @@ void search_btree(char *bin_filename, char *btree_filename){
 
 
 
+// Funcionalidade 10 ------------------------------------------------------
+void remove_btree(char *bin_filename, char *btree_filename){
+    FILE *bin = fopen(bin_filename, "r+b");
+    FILE *btree = fopen(btree_filename, "r+b");  
+
+    if(!bin || !btree || status_esta_instavel(bin) || status_esta_instavel(btree)){
+        printf("Falha no processamento do arquivo.\n");
+        if(bin) fclose(bin);
+        if(btree) fclose(btree);
+        return;
+    }
+
+    HeaderBTree *headerB = create_btree_header();
+    btree_header_set_status(headerB, '0');
+    btree_header_write_to_file(btree, headerB);
+
+    // Busca
+    int noRaiz = btree_header_get_noRaiz(headerB);
+
+    int n;
+    scanf(" %d", &n);
+    for(int i = 0; i < n; i++){
+        int m;
+        scanf(" %d", &m);
+        Criterio *criterios = input_criterios(m);
+
+        // Verificar qual mecanismo de busca usar
+        int chave_busca = get_chave_busca_criterio(criterios, m);
+        
+        bool encontrou = false;
+        
+        // Caso codEstação seja criterio de busca, usa-se busca na arvore
+        if(chave_busca != -1){
+            NodeSearch *result = btree_search_recursive(btree, noRaiz, -1, chave_busca);
+            
+            // Verifica se achou a chave
+            bool foundNode = btree_nodeSearch_get_found(result);
+            if(foundNode == false){
+                free_search_result(&result);
+                free(criterios);
+                continue;
+            }
+
+            free_search_result(&result);
 
 
 
 
+        }
+        /*
+        Caso não seja, usa busca como na funcionalidade 3 (sem a arvore B)
+        else{
+            encontrou = search_records(bin, criterios, m, remove_register, ctx);
+        }
+        */ 
+
+
+        free(criterios);
+    }
+
+    btree_header_set_status(headerB, '1');
+    btree_header_write_to_file(btree, headerB);
+
+    free_btree_header(&headerB);
+    fclose(bin);
+    fclose(btree);
+}
 
 // Funcoes auxiliares -----------------------------------------------------
 

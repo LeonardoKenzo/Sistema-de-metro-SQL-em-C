@@ -3,115 +3,116 @@
 #include "dataRegister.h"
 #include "headerRegister.h"
 
-bool create_btree(char *bin_filename, char *btree_filename){
-    FILE *bin = fopen(bin_filename, "r");
-    FILE *btree = fopen(btree_filename, "wb");
-    
-    if(!bin || !btree || status_esta_instavel(bin)){
-        printf("Falha no processamento do arquivo.\n");
-        return false;
-    }
+struct NodeSearchResult{
+    bool found;
+    int rrn;
+    int rrnPai;
+    int indice;
+};
 
-    HeaderBTree *headerB = create_btree_header();
-    btree_header_write_to_file(btree, headerB);
-
-    Record *record;
-    NodeB *no;
-    char removido;
-    int RRN = 0, posRecord = 0, RRNNo = -1;
-    btree_header_set_noRaiz(headerB, RRNNo);
-
-    // Percorre todo o arquivo binario para criar o indice de arvore B
-    fseek(bin, 17, SEEK_SET);
-    while(fread(&removido, sizeof(char), 1, bin) == 1){
-
-        // Ignora os registros removidos
-        if(removido == '1'){
-            RRN++;
-            posRecord = 17 + RRN * 80;
-            fseek(bin, posRecord, SEEK_SET);
-            continue;
-        }   
-
-        // Pega a chave primária e o posOffset do registro encontrado
-        posRecord = 17 + RRN * 80;
-        fseek(bin, posRecord, SEEK_SET);
-        record = record_read_from_file(bin);
-        int chave = record_get_codEstacao(record);
-
-        // Criação da arvore b -------------------------------------
-        
-        // Se não tiver nenhum no da arvore, cria o primeiro no raiz
-        if(RRNNo == -1){
-            RRNNo++;
-            no = create_btree_node(-1);
-            btree_header_set_noRaiz(headerB, RRNNo);
-        }
-        else {
-            // Pega o no raiz pelo RRN do noRaiz
-            int posOffsetNo = 17 + 53 * btree_header_get_noRaiz(headerB);
-            no = btree_node_read_from_file_at_offset(btree, posOffsetNo);
-        }
-
-        // Realiza uma busca (talvez binária) para verificar se já existe essa chave e garantir que estejamos em um nó raiz
-        busca_binaria(no, chave);
-
-        RRN++;
-
-        free_btree_node(&no);
-        free_record(&record);
-    }
-
-    
-    btree_header_set_status(headerB, '1');
-    btree_header_write_to_file(btree, headerB);
-    free_btree_header(headerB);
-
-    fclose(bin);
-    fclose(btree);
-}
-
-int busca_binaria(NodeB *no, int chave){
-    // Verifica se achou o registro
-    int posOffsetChave = btree_node_buscar_chave(no, chave);
-    
-    // Se achou retorna
-    if(posOffsetChave != -1){
-        return posOffsetChave; 
-    }
-
-    // Se não, verifica se é folha
-    if(btree_node_get_tipoNo(no) != -1){
-        int meio = btree_node_get_nroChaves(no) / 2;
-        printf("%d", meio);
+NodeSearch *btree_search_recursive(FILE *btree, int rrnAtual, int rrnPai, int chave_busca){
+    if(rrnAtual == -1){
+        NodeSearch *result = create_btree_nodeSearch(false, -1, rrnPai, -1);
+        return result;
     }
     
-}
-
-int btree_search_recursive(FILE *btree, int rrn, int chave_busca){
-    if(rrn == -1) return -1;
-
-    int byteOffset = 17 + rrn * 53;
+    int byteOffset = 17 + rrnAtual * 53;
     NodeB *node = btree_node_read_from_file_at_offset(btree, byteOffset);
-    if (node == NULL) return -1;
+    if (node == NULL){
+        NodeSearch *result = create_btree_nodeSearch(false, -1, rrnPai, -1);
+        return result;
+    }    
 
     // Verifica se a chave está neste nó
-    int ponteiro_dados = btree_node_buscar_chave(node, chave_busca);
-    if (ponteiro_dados != -1) {
+    int indice = btree_node_buscar_chave(node, chave_busca);
+    if (indice != -1) {
         free_btree_node(&node);
-        return ponteiro_dados; // retorna o offset no arquivo de dados
+        NodeSearch *result = create_btree_nodeSearch(true, rrnAtual, rrnPai, indice);
+        return result;
     }
     
     // Se for folha e não achou, a chave não existe na árvore
     if (btree_node_get_tipoNo(node) == -1) {
         free_btree_node(&node);
-        return -1;
+        NodeSearch *result = create_btree_nodeSearch(false, -1, rrnPai, -1);
+        return result;
     }
 
     // Caso não seja folha, encontra o filho correto e continua a busca
     int filho_rrn = btree_node_get_child_rrn(node, chave_busca);
     free_btree_node(&node);
 
-    return btree_search_recursive(btree, filho_rrn, chave_busca);
+    return btree_search_recursive(btree, filho_rrn, rrnAtual, chave_busca);
+}
 
+int alocar_rrn_novo_no(FILE *btree, HeaderBTree *headerB){
+    int topo = btree_header_get_topo(headerB);
+    if(topo == -1){
+        btree_header_set_nroNos(headerB, btree_header_get_nroNos(headerB) + 1);
+        return btree_header_get_proxRRN(headerB);
+    }
+
+    int posOffset = 17 + topo * 53;
+
+    NodeB* node = btree_node_read_from_file_at_offset(btree, posOffset);
+    int novoTopo = btree_node_get_proximo(node);
+
+    btree_header_set_nroNos(headerB, btree_header_get_nroNos(headerB) + 1);
+    btree_header_set_topo(headerB, novoTopo);
+    
+    free_btree_node(&node);
+
+    return topo;
+}
+
+void remover_logicamente_no(FILE *btree, HeaderBTree *headerB, int rrnNo){
+    int antigoTopo = btree_header_get_topo(headerB);
+    int posOffset = 17 + rrnNo * 53;
+
+    NodeB *node = btree_node_read_from_file_at_offset(btree, posOffset);
+    btree_node_set_removido(node, '1');
+    btree_node_set_proximo(node, antigoTopo);
+    btree_header_set_nroNos(headerB, btree_header_get_nroNos(headerB) - 1);
+
+    fseek(btree, posOffset, SEEK_SET);
+    btree_node_write_to_file(btree, node);
+    
+    btree_header_set_topo(headerB, rrnNo);
+
+    free_btree_node(&node);
+}
+
+NodeSearch *create_btree_nodeSearch(bool found, int rrnfilho, int rrnPai, int indice){
+    NodeSearch *nodeSearch = (NodeSearch *)calloc(1, sizeof(NodeSearch));
+    if(nodeSearch == NULL)
+        return NULL;
+
+    nodeSearch->found = found;
+    nodeSearch->rrn = rrnfilho;
+    nodeSearch->rrnPai = rrnPai;
+    nodeSearch->indice = indice;
+    
+    return nodeSearch;
+}
+
+bool btree_nodeSearch_get_found(NodeSearch *nodeSearch){
+    if(nodeSearch) return nodeSearch->found;
+    return false;
+}
+
+int btree_nodeSearch_get_rrn(NodeSearch *nodeSearch){
+    if(nodeSearch) return nodeSearch->rrn;
+    return -1;
+}
+
+int btree_nodeSearch_get_indice(NodeSearch *nodeSearch){
+    if(nodeSearch) return nodeSearch->indice;
+    return -1;
+}
+
+void free_search_result(NodeSearch **result) {
+    if (result && *result) {
+        free(*result);
+        *result = NULL;
+    }
 }

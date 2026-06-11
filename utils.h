@@ -7,7 +7,7 @@
     #include <string.h>
     #include <stdbool.h>
 
-    // Structs para buscar registro de dados do arquivo binario
+    // Structs para buscar registro de dados
     typedef struct Criterios Criterio;
     typedef struct Contextos Contexto;
 

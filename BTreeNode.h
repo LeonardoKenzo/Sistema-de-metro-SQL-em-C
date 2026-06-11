@@ -12,7 +12,7 @@
     // funcoes
     int btree_node_buscar_chave(NodeB *node, int chave);
     bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filho);
-    bool btree_node_remover_chave(NodeB *node, int chave);
+    bool btree_node_remover_chave(NodeB *node, int indice);
     
     // getters
     char btree_node_get_removido(NodeB *node);
