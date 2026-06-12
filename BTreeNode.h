@@ -13,6 +13,7 @@
     int btree_node_buscar_chave(NodeB *node, int chave);
     bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filho);
     bool btree_node_remover_chave(NodeB *node, int indice);
+    bool btree_node_insert_and_split(NodeB *node, int chave_in, int ponteiro_in, int filho_direito_in, int *chave_pro, int *ponteiro_pro, NodeB **novo_no);
     
     // getters
     char btree_node_get_removido(NodeB *node);

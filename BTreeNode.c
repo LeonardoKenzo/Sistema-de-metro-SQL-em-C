@@ -205,3 +205,68 @@ int btree_node_get_child_rrn(NodeB *node, int chave) {
     }
     return node->ponteiros[i];
 }
+
+// Retorna true se houver split. Retorna a chave e o ponteiro promovidos, novo nó da direita
+bool btree_node_insert_and_split(NodeB *node, int chave_in, int ponteiro_in, int filho_direito_in, 
+                                 int *chave_pro, int *ponteiro_pro, NodeB **novo_no) {
+    // Se ainda há espaço, apenas insere e retorna false
+    if (node->nroChaves < MAX_CHAVES) {
+        btree_node_inserir_chave(node, chave_in, ponteiro_in, filho_direito_in);
+        return false; 
+    }
+
+    // Vetores temporários para armazenar e ordenar os elementos
+    ParNo temp_chaves[MAX_CHAVES + 1];
+    int temp_filhos[ORDEM + 1];
+
+    // Copia os dados atuais para o vetor temporário
+    for (int i = 0; i < MAX_CHAVES; i++) {
+        temp_chaves[i] = node->chaves[i];
+        temp_filhos[i] = node->ponteiros[i];
+    }
+    temp_filhos[MAX_CHAVES] = node->ponteiros[MAX_CHAVES];
+
+    // Insere o novo elemento no vetor temporário ordenadamente
+    int pos = MAX_CHAVES - 1;
+    while (pos >= 0 && temp_chaves[pos].chave > chave_in) {
+        temp_chaves[pos + 1] = temp_chaves[pos];
+        temp_filhos[pos + 2] = temp_filhos[pos + 1];
+        pos--;
+    }
+    temp_chaves[pos + 1].chave = chave_in;
+    temp_chaves[pos + 1].ponteiro = ponteiro_in;
+    temp_filhos[pos + 2] = filho_direito_in;
+
+    // Atualiza o tipo do nó
+    if (node->tipoNo == 0) node->tipoNo = 1;
+
+    // Cria o novo nó da direita partilhando o mesmo tipo
+    *novo_no = create_btree_node(node->tipoNo);
+
+    // Reseta o nó atual antes de redistribuir
+    for(int i = 0; i < MAX_CHAVES; i++){
+        node->chaves[i] = (ParNo){-1, -1};
+        node->ponteiros[i] = -1;
+    }
+    node->ponteiros[MAX_CHAVES] = -1;
+
+    // Nó da esquerda pega os índices 0 e 1 
+    node->chaves[0] = temp_chaves[0];
+    node->chaves[1] = temp_chaves[1];
+    node->nroChaves = 2;
+    node->ponteiros[0] = temp_filhos[0];
+    node->ponteiros[1] = temp_filhos[1];
+    node->ponteiros[2] = temp_filhos[2];
+
+    // A chave promovida será o índice 2
+    *chave_pro = temp_chaves[2].chave;
+    *ponteiro_pro = temp_chaves[2].ponteiro;
+
+    // O nó da direita (novo_no) fica com a chave restante
+    (*novo_no)->chaves[0] = temp_chaves[3];
+    (*novo_no)->nroChaves = 1;
+    (*novo_no)->ponteiros[0] = temp_filhos[3];
+    (*novo_no)->ponteiros[1] = temp_filhos[4];
+
+    return true; // Houve split
+}

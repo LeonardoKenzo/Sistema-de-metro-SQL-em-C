@@ -512,7 +512,104 @@ void search_btree(char *bin_filename, char *btree_filename){
     fclose(btree);
 }
 
+// Funcioalidade 9
+void insert_btree(char *bin_filename, char *btree_filename){
+    FILE *bin = fopen(bin_filename, "r+b");
+    FILE *btree = fopen(btree_filename, "r+b");
+    
+    if(!bin || !btree || status_esta_instavel(bin)){
+        printf("Falha no processamento do arquivo.\n"); 
+        if (bin) fclose(bin);
+        if (btree) fclose(btree);
+        return;
+    }
 
+    // Validações e marcação de instabilidade
+    Header *h = create_header_register();
+    header_read_from_file(bin, h);
+    header_set_status(h, '0');
+    header_write_to_file(bin, h);
+
+    HeaderBTree *hBTree = create_btree_header();
+    btree_header_read_from_file(btree, hBTree);
+    if(btree_header_get_status(hBTree) == '0') {
+        printf("Falha no processamento do arquivo.\n");
+        free_header_register(&h);
+        free_btree_header(&hBTree);
+        fclose(bin); fclose(btree);
+        return;
+    }
+    btree_header_set_status(hBTree, '0');
+    btree_header_write_to_file(btree, hBTree);
+
+    int n;
+    if(scanf(" %d", &n) != 1) return;
+
+    for(int i = 0; i < n; i++){
+        Record *r = create_record();
+        char buffer_str[100];
+
+        int codEstacao;
+        scanf(" %d", &codEstacao);
+        record_set_codEstacao(r,codEstacao);
+
+        ScanQuoteString(buffer_str);
+        record_set_nomeEstacao(r, buffer_str);
+
+        record_set_codLinha(r, input_inteiro_ou_nulo());
+
+        ScanQuoteString(buffer_str);
+        record_set_nomeLinha(r, buffer_str);
+
+        record_set_codProxEstacao(r, input_inteiro_ou_nulo());
+        record_set_distProxEstacao(r, input_inteiro_ou_nulo());
+        record_set_codLinhaIntegra(r, input_inteiro_ou_nulo());
+        record_set_codEstIntegra(r, input_inteiro_ou_nulo());
+
+        int topo = header_get_topo(h);
+        int offset_inserido; // Guarda o local do novo registro
+
+        if (topo == -1) {
+            int proxRRN = header_get_proxRRN(h);
+            offset_inserido = 17 + (proxRRN * 80);
+            fseek(bin, offset_inserido, SEEK_SET);
+            record_write_to_file(bin, r);
+            header_set_proxRRN(h, proxRRN + 1);
+        }
+        else {
+            offset_inserido = 17 + topo * 80;
+            fseek(bin, offset_inserido, SEEK_SET);
+            
+            Record *recordRemovido = record_read_from_file(bin);
+            int prox_na_pilha = record_get_proximo(recordRemovido);
+        
+            fseek(bin, offset_inserido, SEEK_SET);
+            record_write_to_file(bin, r);
+
+            int novo_topo_offset = (prox_na_pilha == -1) ? -1 : prox_na_pilha;
+            header_set_topo(h, novo_topo_offset);
+
+            free_record(&recordRemovido);
+        }
+        free_record(&r);
+
+        // Inserir a chave e o offset
+        btree_insert(btree, hBTree, codEstacao, offset_inserido);
+    }
+
+    // Fechar tudo 
+    set_header_estacoes_unicas(bin, h);
+    header_set_status(h, '1'); 
+    header_write_to_file(bin, h);
+
+    btree_header_set_status(hBTree, '1');
+    btree_header_write_to_file(btree, hBTree);
+
+    free_header_register(&h);
+    free_btree_header(&hBTree);
+    fclose(bin);
+    fclose(btree);
+}
 
 
 

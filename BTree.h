@@ -21,4 +21,5 @@
     int btree_nodeSearch_get_rrn(NodeSearch *nodeSearch);
     int btree_nodeSearch_get_indice(NodeSearch *nodeSearch);
 
+    void btree_insert(FILE *btree, HeaderBTree *h, int chave, int offset);
 #endif
