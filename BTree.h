@@ -30,5 +30,9 @@
     // Remocao
     NodeSearch *btree_find_successor(FILE *btree, int rrnAtual);
 
-
+    // Funções de tratamento de underflow
+    bool btree_redistribute_right(FILE *btree, int rrnFilho, int rrnPai);
+    bool btree_redistribute_left(FILE *btree, int rrnFilho, int rrnPai);
+    bool btree_merge_right(FILE *btree, int rrnFilho, int rrnPai);
+    bool btree_merge_left(FILE *btree, int rrnFilho, int rrnPai);
 #endif

@@ -229,7 +229,7 @@ void btree_insert(FILE *btree, HeaderBTree *h, int chave, int offset) {
         free_btree_node(&raiz);
         
         btree_header_set_noRaiz(h, rrn_novo);
-        btree_header_set_proxRRN(h, 1);
+        //btree_header_set_proxRRN(h, 1); | alocar_rrn_novo_no() já cuida de incrementar o proxRRN
         return;
     }
 

@@ -397,8 +397,8 @@ void update_table(char *bin_filename)
 
 bool create_btree(char *bin_filename, char *btree_filename)
 {
-    FILE *bin = fopen(bin_filename, "r");
-    FILE *btree = fopen(btree_filename, "wb");
+    FILE *bin = fopen(bin_filename, "rb");
+    FILE *btree = fopen(btree_filename, "w+b");
 
     if (!bin || !btree || status_esta_instavel(bin))
     {
@@ -450,6 +450,8 @@ bool create_btree(char *bin_filename, char *btree_filename)
 
     fclose(bin);
     fclose(btree);
+
+    return true;
 }
 
 // Funcionalidade 8 --------------------------------------------------
@@ -509,26 +511,40 @@ void search_btree(char *bin_filename, char *btree_filename)
 
         if (chave_busca != -1)
         {
-            // Caso codEstação seja criterio de busca, usa-se busca na arvore
+            // Busca com a Árvore-B
             int caminho[8];
             NodeSearch *nodeFound = btree_search_recursive(btree, noRaiz, -1, chave_busca, caminho, 0);
-            int rrn = btree_nodeSearch_get_rrn(nodeFound);
-
-            if (rrn != -1)
+            
+            // Garantir que a chave realmente foi encontrada na árvore
+            if (btree_nodeSearch_get_found(nodeFound))
             {
-                int offset_dados = 17 + rrn * 53;
+                int rrn = btree_nodeSearch_get_rrn(nodeFound);
+                int indice = btree_nodeSearch_get_indice(nodeFound);
 
-                fseek(bin, offset_dados, SEEK_SET);
-                Record *r = record_read_from_file(bin);
-                // a Arvore devolve o registro, precisa ver se nao esta removido logicamente
-                if (r != NULL)
-                {
-                    if (record_get_removido(r) == '0' && atende_criterios(r, criterios, m))
+                // Lê o nó da Árvore-B onde a busca parou
+                int offset_no_btree = 17 + rrn * 53;
+                NodeB *node = btree_node_read_from_file_at_offset(btree, offset_no_btree);
+                
+                // Extrai o ponteiro para o arquivo de dados
+                int offset_dados = btree_node_get_ponteiro_chave(node, indice);
+                free_btree_node(&node); // Libera o nó da memória
+
+                // Busca o registro no arquivo .bin
+                if (offset_dados != -1) {
+                    fseek(bin, offset_dados, SEEK_SET);
+                    Record *r = record_read_from_file(bin);
+                    
+                    if (r != NULL)
                     {
-                        print_register(r, offset_dados, NULL); // Imprime formatado
-                        encontrou = true;
+                        // A Árvore devolve o registro, precisa ver se não está logicamente removido
+                        // e se atende aos possíveis outros critérios de busca
+                        if (record_get_removido(r) == '0' && atende_criterios(r, criterios, m))
+                        {
+                            print_register(r, offset_dados, NULL); 
+                            encontrou = true;
+                        }
+                        free_record(&r);
                     }
-                    free_record(&r);
                 }
             }
             free_search_result(&nodeFound);
@@ -737,7 +753,8 @@ void remove_btree(char *bin_filename, char *btree_filename)
             if (btree_node_get_tipoNo(nodeRemove) != -1)
             {
                 // Encontra a sucessora imediata
-                NodeSearch *sucessora = btree_find_successor(btree, rrnEncontrado, indice);
+                int rrnSubarvoreDireita = btree_node_get_ponteiro(nodeRemove, indice + 1);
+                NodeSearch *sucessora = btree_find_successor(btree, rrnSubarvoreDireita);
 
                 int rrnSucessora = btree_nodeSearch_get_rrn(sucessora);
                 int indiceSucessora = btree_nodeSearch_get_indice(sucessora);
