@@ -18,7 +18,7 @@
     void update_table(char *bin_filename);
 
     bool create_btree(char *bin_filename, char *btree_filename);
-    void search_btree_table(char *bin_filename, char *btree_filename);
+    void search_btree(char *bin_filename, char *btree_filename);
     void insert_btree(char *bin_filename, char *btree_filename);
     void remove_btree(char *bin_filename, char *btree_filename);
 #endif

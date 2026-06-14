@@ -5,21 +5,26 @@
     #include <stdbool.h>
 
     typedef struct BTreeNode NodeB;
-
+    
     NodeB *create_btree_node(int tipoNo);
     void free_btree_node(NodeB **node);
+    int btree_ordem();
 
     // funcoes
     int btree_node_buscar_chave(NodeB *node, int chave);
-    bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filho);
+    bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filhoDireito);
     bool btree_node_remover_chave(NodeB *node, int indice);
     bool btree_node_insert_and_split(NodeB *node, int chave_in, int ponteiro_in, int filho_direito_in, int *chave_pro, int *ponteiro_pro, NodeB **novo_no);
-    
+    bool btree_node_has_underflow(NodeB *node) ;
+
     // getters
     char btree_node_get_removido(NodeB *node);
     int btree_node_get_proximo(NodeB *node);
     int btree_node_get_tipoNo(NodeB *node);
     int btree_node_get_nroChaves(NodeB *node);
+    int btree_node_get_chave(NodeB *node, int indice);
+    int btree_node_get_ponteiro_chave(NodeB *node, int indice);
+    int btree_node_get_ponteiro(NodeB *node, int indice);
 
     // setters
     void btree_node_set_removido(NodeB *node, char removido);
@@ -27,6 +32,8 @@
     void btree_node_set_tipoNo(NodeB *node, int tipoNo);
     void btree_node_set_nroChaves(NodeB *node, int nroChaves);
     void bree_node_set_filho_inicial(NodeB *node, int filho);
+    void btree_node_set_parChave(NodeB *node, int indice, int chave, int ponteiro);
+    void btree_node_set_ponteiro(NodeB *node, int indice, int ponteiro);
 
     // I/O - Escrita campo a campo
     void btree_node_write_to_file(FILE *fp, NodeB *node);

@@ -1,6 +1,7 @@
 #include "BTreeNode.h"
 #define ORDEM 4
 #define MAX_CHAVES (ORDEM - 1)
+#define MIN_CHAVES (ORDEM /2 -1)
 
 typedef struct ParNo{
     int chave;
@@ -58,6 +59,25 @@ int btree_node_get_nroChaves(NodeB *node){
     return -1;
 }
 
+int btree_node_get_chave(NodeB *node, int indice){
+    if(node) return node->chaves[indice].chave;
+    return -1;
+}
+
+int btree_node_get_ponteiro_chave(NodeB *node, int indice){
+    if(node) return node->chaves[indice].ponteiro;
+    return -1;
+}
+
+int btree_node_get_ponteiro(NodeB *node, int indice){
+    if(node) return node->ponteiros[indice];
+    return -1;
+}
+
+int btree_ordem(){
+    return ORDEM;
+}
+
 void btree_node_set_removido(NodeB *node, char removido){
     if(node) node->removido = removido;
 }
@@ -78,6 +98,17 @@ void bree_node_set_filho_inicial(NodeB *node, int filho){
     if(node) node->ponteiros[0] = filho;
 }
 
+void btree_node_set_parChave(NodeB *node, int indice, int chave, int ponteiro){
+    if(node){
+        node->chaves[indice].chave = chave;
+        node->chaves[indice].ponteiro = ponteiro;
+    }
+}
+
+void btree_node_set_ponteiro(NodeB *node, int indice, int ponteiro){
+    if(node) node->ponteiros[indice] = ponteiro;
+}
+
 int btree_node_buscar_chave(NodeB *node, int chave){
     if(node == NULL)
         return -1;
@@ -91,7 +122,7 @@ int btree_node_buscar_chave(NodeB *node, int chave){
     return -1;
 }
 
-bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filho){
+bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filhoDireito){
     if(node == NULL)
         return false;
 
@@ -110,7 +141,7 @@ bool btree_node_inserir_chave(NodeB *node, int chave, int ponteiro, int filho){
         }
         node->chaves[i + 1].chave = chave;
         node->chaves[i + 1].ponteiro = ponteiro;
-        node->ponteiros[i + 2] = filho;
+        node->ponteiros[i + 2] = filhoDireito;
     } 
     else {
         return false;
@@ -185,6 +216,11 @@ NodeB *btree_node_read_from_file_at_offset(FILE *fp, int byteOffset){
     }
 
     return node;
+}
+
+bool btree_node_has_underflow(NodeB *node){
+    if(node->nroChaves < MIN_CHAVES) return true;
+    return false;
 }
 
 void free_btree_node(NodeB **node){

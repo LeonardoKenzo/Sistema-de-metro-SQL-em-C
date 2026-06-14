@@ -67,7 +67,7 @@ int main(void){
         char arq_bin[100], arq_btree[100];
         scanf("%s %s", arq_bin, arq_btree);
         create_btree(arq_bin, arq_btree);
-        binarioNaTela(arq_btree);
+        BinarioNaTela(arq_btree);
         break;
     }
     case 8:{
@@ -91,8 +91,8 @@ int main(void){
         char arq_bin[100], arq_btree[100];
         scanf("%s %s", arq_bin, arq_btree);
         remove_btree(arq_bin, arq_btree);
-        binarioNaTela(arq_bin);
-        binarioNaTela(arq_btree);
+        BinarioNaTela(arq_bin);
+        BinarioNaTela(arq_btree);
         break;
     }
     }   
