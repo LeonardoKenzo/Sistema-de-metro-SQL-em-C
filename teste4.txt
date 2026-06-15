@@ -1,0 +1,2 @@
+8 estacao.bin indice.bin 1
+1 codEstacao 99
