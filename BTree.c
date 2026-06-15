@@ -459,6 +459,7 @@ bool btree_merge_right(FILE *btree, int rrnFilho, int rrnPai) {
     btree_header_read_from_file(btree, headerB);
     remover_logicamente_no(btree, headerB, rrnDireito);
 
+    free_btree_header(&headerB);
     free_btree_node(&nodePai);
     free_btree_node(&nodeUnderflow);
     free_btree_node(&nodeDireito);
@@ -515,6 +516,7 @@ bool btree_merge_left(FILE *btree, int rrnFilho, int rrnPai) {
     btree_header_read_from_file(btree, headerB);
     remover_logicamente_no(btree, headerB, rrnFilho);
 
+    free_btree_header(&headerB);
     free_btree_node(&nodePai);
     free_btree_node(&nodeUnderflow);
     free_btree_node(&nodeEsquerdo);

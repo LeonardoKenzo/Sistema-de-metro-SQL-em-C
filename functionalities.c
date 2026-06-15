@@ -705,7 +705,6 @@ void remove_btree(char *bin_filename, char *btree_filename)
         // Caso codEstação seja criterio de busca, usa-se busca na arvore
         if (chave_busca != -1)
         {
-
             int caminho[8];
             NodeSearch *result = btree_search_recursive(btree, noRaiz, -1, chave_busca, caminho, 0);
 
@@ -783,8 +782,7 @@ void remove_btree(char *bin_filename, char *btree_filename)
                     btree_merge_left(btree, rrnAtual, rrnPai) ||
                     btree_merge_right(btree, rrnAtual, rrnPai))
                 {
-
-                    // Relê o pai para verificar se ele entrou em underflow
+                    // Rele o pai para verificar se ele entrou em underflow
                     nodeRemove = btree_node_read_from_file_at_offset(btree, 17 + rrnPai * 53);
                     nivelAtual--;
                 }
@@ -808,12 +806,10 @@ void remove_btree(char *bin_filename, char *btree_filename)
             free(criterios);
             continue;
         }
-        /*
-        Caso não seja, usa busca como na funcionalidade 3 (sem a arvore B)
+        // Caso não seja, usa busca como na funcionalidade 3 (sem a arvore B)
         else{
             encontrou = search_records(bin, criterios, m, remove_register, ctx);
         }
-        */
 
         free(criterios);
     }
@@ -872,11 +868,9 @@ int btree_fix_underflow(FILE *btree, int rrnFilho, int rrnPai)
     if (btree_redistribute_left(btree, rrnFilho, rrnPai))
         return -1;
 
-    // 3. Concatenacao a esquerda e o resultado fica no irmao esquerdo, destroi rrnFilho
     if (btree_merge_left(btree, rrnFilho, rrnPai))
         return rrnPai; // pai perdeu uma chave verificar underflow
 
-    // 4. Concatenacao a direita e o resultado fica em rrnFilho, destroi irmao direito
     btree_merge_right(btree, rrnFilho, rrnPai);
     return rrnPai; // pai perdeu uma chave verificar underflow
 }
