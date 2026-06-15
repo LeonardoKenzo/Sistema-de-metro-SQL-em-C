@@ -628,6 +628,18 @@ bool insert_btree(char *bin_filename, char *btree_filename)
         record_set_codLinhaIntegra(r, input_inteiro_ou_nulo());
         record_set_codEstIntegra(r, input_inteiro_ou_nulo());
 
+        // Checa na árvore-B se a chave já existe
+        int caminho[8];
+        int noRaizAtual = btree_header_get_noRaiz(hBTree);
+        NodeSearch *search = btree_search_recursive(btree, noRaizAtual, -1, codEstacao, caminho, 0);
+        if (btree_nodeSearch_get_found(search)) {
+            // A chave já existe -> Ignora a inserção completamente
+            free_search_result(&search);
+            free_record(&r);
+            continue; 
+        }
+        free_search_result(&search);
+
         int topo = header_get_topo(h);
         int offset_inserido; // Guarda o local do novo registro
 
@@ -657,7 +669,7 @@ bool insert_btree(char *bin_filename, char *btree_filename)
         }
         free_record(&r);
 
-        // Inserir a chave e o offset
+        // Inserir a chave e o offset 
         btree_insert(btree, hBTree, codEstacao, offset_inserido);
     }
 
@@ -675,7 +687,6 @@ bool insert_btree(char *bin_filename, char *btree_filename)
     fclose(btree);
     return true;
 }
-
 // Funcionalidade 10 ------------------------------------------------------
 void remove_btree(char *bin_filename, char *btree_filename)
 {

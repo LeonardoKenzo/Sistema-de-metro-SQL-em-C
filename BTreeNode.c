@@ -28,13 +28,11 @@ NodeB *create_btree_node(int tipoNo){
     node->tipoNo = tipoNo;
     node->nroChaves = 0;
 
-    node->chaves[0] = (ParNo){-1, -1};
-    node->chaves[1] = (ParNo){-1, -1};
-    node->chaves[2] = (ParNo){-1, -1};
-
-    for(int i = 0; i < ORDEM; i++){
+    for(int i = 0; i < MAX_CHAVES; i++){
+        node->chaves[i] = (ParNo){-1, -1};
         node->ponteiros[i] = -1;
     }
+    node->ponteiros[MAX_CHAVES] = -1;
 
     return node;
 }
@@ -194,7 +192,7 @@ NodeB *btree_node_read_from_file_at_offset(FILE *fp, int byteOffset){
         return NULL;
     }
 
-    NodeB *node = (NodeB *)calloc(1, sizeof(NodeB));
+    NodeB *node = create_btree_node(0); // tirei o calloc pq ele coloca 0 em tudo e tava dando errado
     if(node == NULL){
         return NULL;
     }
@@ -279,14 +277,14 @@ bool btree_node_insert_and_split(NodeB *node, int chave_in, int ponteiro_in, int
     // Cria o novo nó da direita partilhando o mesmo tipo
     *novo_no = create_btree_node(node->tipoNo);
 
-    // Reseta o nó atual antes de redistribuir
+    // Hard reset para evitar gravação de lixo
     for(int i = 0; i < MAX_CHAVES; i++){
         node->chaves[i] = (ParNo){-1, -1};
         node->ponteiros[i] = -1;
     }
     node->ponteiros[MAX_CHAVES] = -1;
 
-    // Nó da esquerda pega os índices 0 e 1 
+    // Nó esquerdo fica com 2 chaves, nó direito com 1 chave
     node->chaves[0] = temp_chaves[0];
     node->chaves[1] = temp_chaves[1];
     node->nroChaves = 2;
