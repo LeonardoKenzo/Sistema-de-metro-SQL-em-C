@@ -5,6 +5,7 @@
 #include "headerRegister.h"
 #include "dataRegister.h"
 #include "fornecidas.h"
+#include "BTree.h"
 #include "utils.h"
 
 struct Criterios{
@@ -23,6 +24,11 @@ struct Contextos{
 
     // para pausar a busca apos encontrar um registro
     bool pararBusca;
+
+    // para remocao em arvoreB
+    FILE *btree;
+    HeaderBTree *headerB;
+    int *noRaiz; // ponteiro para atualizar a raiz se necessario
 };
 
 // Procura por registros que atendem aos criterios e executa a funcionalidade passada como parametro
@@ -346,25 +352,51 @@ Contexto *atualizar_contexto(Contexto *ctx, Criterio *atualizar, int p) {
     return ctx;
 }
 
+Contexto *remove_btree_contexto(Contexto *ctx, FILE *btree, HeaderBTree *headerB, int *noRaiz){
+    if(ctx == NULL) return NULL;
+    ctx->btree = btree;
+    ctx->headerB = headerB;
+    ctx->noRaiz = noRaiz;
+}
+
 Contexto *pausar_busca(Contexto *ctx) {
     ctx->pararBusca = true;
     return ctx;
 }
 
 FILE *get_file_from_context(Contexto *ctx) {
-    return ctx->bin;
+    if(ctx) return ctx->bin;
+    return NULL;
 }
 
 Header *get_header_from_context(Contexto *ctx) {
-    return ctx->header;
+    if(ctx) return ctx->header;
+    return NULL;
 }
 
 Criterio *get_atualizar_from_context(Contexto *ctx) {
-    return ctx->atualizar;
+    if(ctx) return ctx->atualizar;
+    return NULL;
 }
 
 int get_p_from_context(Contexto *ctx) {
-    return ctx->p;
+    if(ctx) return ctx->p;
+    return -1;
+}
+
+FILE *get_btree_from_context(Contexto *ctx){
+    if(ctx) return ctx->btree;
+    return NULL;
+}
+
+HeaderBTree *get_headerB_from_context(Contexto *ctx){
+    if(ctx) return ctx->headerB;
+    return NULL;
+}
+
+int *get_noRaiz_from_context(Contexto *ctx){
+    if(ctx) return ctx->noRaiz;
+    return NULL;
 }
 
 // Verifica se o 'codEstacao' foi fornecido e retorna seu valor. Retorna -1 se não existir.

@@ -39,6 +39,7 @@
     // Manipular contexto de busca para determinar o que fazer com o registro encontrado após encontrá-lo
     Contexto *criar_contexto(FILE *bin, Header *header, Criterio *atualizar, int p);
     Contexto *atualizar_contexto(Contexto *ctx, Criterio *atualizar, int p);
+    Contexto *remove_btree_contexto(Contexto *ctx, FILE *btree, HeaderBTree *headerB, int *noRaiz);
     Contexto *pausar_busca(Contexto *ctx);
 
     // Verifica se 'codEstacao' foi fornecido como criterio de busca
@@ -46,8 +47,11 @@
     
     // getters do contexto
     FILE *get_file_from_context(Contexto *ctx);
+    FILE *get_btree_from_context(Contexto *ctx);
     Criterio *get_atualizar_from_context(Contexto *ctx);
     Header *get_header_from_context(Contexto *ctx);
+    HeaderBTree *get_headerB_from_context(Contexto *ctx);
     int get_p_from_context(Contexto *ctx);
+    int *get_noRaiz_from_context(Contexto *ctx);
 
 #endif

@@ -10,7 +10,7 @@ struct NodeSearchResult{
     int indice;
 
     int caminho[8];
-    int profundidade
+    int profundidade;
 };
 
 NodeSearch *btree_search_recursive(FILE *btree, int rrnAtual, int rrnPai, int chave_busca, int *caminho, int profundidade){
@@ -136,7 +136,7 @@ int btree_nodeSearch_get_profundidade(NodeSearch *nodeSearch){
 
 int *btree_nodeSearch_get_caminho(NodeSearch *nodeSearch){
     if(nodeSearch) return nodeSearch->caminho;
-    return -1;
+    return NULL;
 }
 
 void btree_nodeSearch_set_caminho(NodeSearch *nodeDestino, int *caminho, int size){
@@ -522,4 +522,77 @@ bool btree_merge_left(FILE *btree, int rrnFilho, int rrnPai) {
     free_btree_node(&nodeEsquerdo);
 
     return true;
+}
+
+void btree_remove_key(FILE *btree, HeaderBTree *headerB, int *noRaiz, NodeSearch *result, int caminho[8]) {
+    int rrnEncontrado     = btree_nodeSearch_get_rrn(result);
+    int indice            = btree_nodeSearch_get_indice(result);
+    int profundidade      = btree_nodeSearch_get_profundidade(result);
+    int rrnParaEscrever   = rrnEncontrado;
+    int indiceParaRemover = indice;
+
+    NodeB *nodeRemove = btree_node_read_from_file_at_offset(btree, 17 + rrnEncontrado * 53);
+
+    // Se nao eh folha, troca pela sucessora
+    if (btree_node_get_tipoNo(nodeRemove) != -1) {
+        int rrnSubarvoreDireita = btree_node_get_ponteiro(nodeRemove, indice + 1);
+        NodeSearch *sucessora = btree_find_successor(btree, rrnSubarvoreDireita);
+
+        int rrnSucessora = btree_nodeSearch_get_rrn(sucessora);
+        int indiceSucessora = btree_nodeSearch_get_indice(sucessora);
+
+        NodeB *nodeSucessora = btree_node_read_from_file_at_offset(btree, 17 + rrnSucessora * 53);
+
+        btree_node_set_parChave(nodeRemove, indice, btree_node_get_chave(nodeSucessora, indiceSucessora), btree_node_get_ponteiro_chave(nodeSucessora, indiceSucessora));
+
+        fseek(btree, 17 + rrnEncontrado * 53, SEEK_SET);
+        btree_node_write_to_file(btree, nodeRemove);
+        free_btree_node(&nodeRemove);
+
+        profundidade = btree_nodeSearch_get_profundidade(sucessora);
+        btree_nodeSearch_set_caminho(result, btree_nodeSearch_get_caminho(sucessora), profundidade * sizeof(int));
+        nodeRemove = nodeSucessora;
+        rrnParaEscrever = rrnSucessora;
+        indiceParaRemover = indiceSucessora;
+
+        free_search_result(&sucessora);
+    }
+
+    // Remove a chave do no folha
+    btree_node_remover_chave(nodeRemove, indiceParaRemover);
+    fseek(btree, 17 + rrnParaEscrever * 53, SEEK_SET);
+    btree_node_write_to_file(btree, nodeRemove);
+
+    // Propaga underflow
+    int nivelAtual = profundidade - 1;
+    while (btree_node_has_underflow(nodeRemove) && nivelAtual > 0) {
+        int *cam     = btree_nodeSearch_get_caminho(result);
+        int rrnAtual = cam[nivelAtual];
+        int rrnPai   = cam[nivelAtual - 1];
+
+        free_btree_node(&nodeRemove);
+
+        if (btree_redistribute_right(btree, rrnAtual, rrnPai) ||
+            btree_redistribute_left(btree, rrnAtual, rrnPai)  ||
+            btree_merge_left(btree, rrnAtual, rrnPai)         ||
+            btree_merge_right(btree, rrnAtual, rrnPai)) {
+            nodeRemove = btree_node_read_from_file_at_offset(btree, 17 + rrnPai * 53);
+            nivelAtual--;
+        } 
+        else {
+            break;
+        }
+    }
+
+    // Verifica se a raiz ficou vazia
+    NodeB *raiz = btree_node_read_from_file_at_offset(btree, 17 + *noRaiz * 53);
+    if (btree_node_get_nroChaves(raiz) == 0) {
+        int novoRrnRaiz = btree_node_get_ponteiro(raiz, 0);
+        remover_logicamente_no(btree, headerB, *noRaiz);
+        btree_header_set_noRaiz(headerB, novoRrnRaiz);
+        btree_header_write_to_file(btree, headerB);
+        *noRaiz = novoRrnRaiz;
+    }
+    free_btree_node(&raiz);
+    free_btree_node(&nodeRemove);
 }

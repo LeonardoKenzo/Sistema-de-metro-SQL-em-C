@@ -81,9 +81,10 @@ int main(void){
         // funcionalidade 9
         char arq_bin[100], arq_btree[100];
         scanf("%s %s", arq_bin, arq_btree);
-        insert_btree(arq_bin, arq_btree);
-        BinarioNaTela(arq_bin);
-        BinarioNaTela(arq_btree);
+        if(insert_btree(arq_bin, arq_btree)){
+            BinarioNaTela(arq_bin);
+            BinarioNaTela(arq_btree);
+        }
         break;
     }
     case 10:{

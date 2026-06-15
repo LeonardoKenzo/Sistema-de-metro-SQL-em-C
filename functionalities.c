@@ -11,10 +11,11 @@
 #include <string.h>
 #include <stdbool.h>
 
-// Funcoes para as funcionalidades 2, 4 e 6
+// Funcoes para as funcionalidades 2, 4, 6 e 10
 void print_register(Record *r, int posRecord, Contexto *ctx);
 void remove_register(Record *r, int posRecord, Contexto *ctx);
 void update_register(Record *r, int posRecord, Contexto *ctx);
+void remove_register_with_btree(Record *r, int posRecord, Contexto *ctx);
 
 // Funcionalidade 1 ------------------------------------------
 bool create_table(char *csv_filename, char *bin_filename)
@@ -567,7 +568,7 @@ void search_btree(char *bin_filename, char *btree_filename)
 }
 
 // Funcionalidade 9
-void insert_btree(char *bin_filename, char *btree_filename)
+bool insert_btree(char *bin_filename, char *btree_filename)
 {
     FILE *bin = fopen(bin_filename, "r+b");
     FILE *btree = fopen(btree_filename, "r+b");
@@ -579,7 +580,7 @@ void insert_btree(char *bin_filename, char *btree_filename)
             fclose(bin);
         if (btree)
             fclose(btree);
-        return;
+        return false;
     }
 
     // Validações e marcação de instabilidade
@@ -597,14 +598,13 @@ void insert_btree(char *bin_filename, char *btree_filename)
         free_btree_header(&hBTree);
         fclose(bin);
         fclose(btree);
-        return;
+        return false;
     }
     btree_header_set_status(hBTree, '0');
     btree_header_write_to_file(btree, hBTree);
 
     int n;
-    if (scanf(" %d", &n) != 1)
-        return;
+    scanf(" %d", &n);
 
     for (int i = 0; i < n; i++)
     {
@@ -673,6 +673,7 @@ void insert_btree(char *bin_filename, char *btree_filename)
     free_btree_header(&hBTree);
     fclose(bin);
     fclose(btree);
+    return true;
 }
 
 // Funcionalidade 10 ------------------------------------------------------
@@ -718,119 +719,39 @@ void remove_btree(char *bin_filename, char *btree_filename)
 
         bool encontrou = false;
 
-        // Caso codEstação seja criterio de busca, usa-se busca na arvore
-        if (chave_busca != -1)
-        {
+        // Caso codEstacao seja criterio de busca, usa-se busca na arvore
+        if (chave_busca != -1) {
             int caminho[8];
             NodeSearch *result = btree_search_recursive(btree, noRaiz, -1, chave_busca, caminho, 0);
 
-            // Verifica se achou a chave
-            bool foundNode = btree_nodeSearch_get_found(result);
-            if (foundNode == false)
-            {
+            // Se nao achou resultado retorne
+            if (!btree_nodeSearch_get_found(result)) {
                 free_search_result(&result);
                 free(criterios);
                 continue;
             }
 
-            int rrnEncontrado = btree_nodeSearch_get_rrn(result);
-            int indice = btree_nodeSearch_get_indice(result);
-            int profundidade = btree_nodeSearch_get_profundidade(result);
-
-            NodeB *nodeRemove = btree_node_read_from_file_at_offset(btree, 17 + rrnEncontrado * 53);
-
-            // Remocao do arquivo binario
-            int posOffsetRemover = btree_node_get_ponteiro_chave(nodeRemove, btree_nodeSearch_get_indice(result));
-            Record *r = record_read_from_file_at_offset(bin, posOffsetRemover);
-            remove_register(r, posOffsetRemover, ctx);
+            // Faz a remocao do arquivo de registros
+            int posOffset = btree_node_get_ponteiro_chave(btree_node_read_from_file_at_offset(btree, 17 + btree_nodeSearch_get_rrn(result) * 53), btree_nodeSearch_get_indice(result));
+            Record *r = record_read_from_file_at_offset(bin, posOffset);
+            remove_register(r, posOffset, ctx);
             free_record(&r);
 
-            // Se nao eh no folha
-            int rrnParaEscrever = rrnEncontrado;
-            int indiceParaRemover = indice;
-
-            if (btree_node_get_tipoNo(nodeRemove) != -1)
-            {
-                // Encontra a sucessora imediata
-                int rrnSubarvoreDireita = btree_node_get_ponteiro(nodeRemove, indice + 1);
-                NodeSearch *sucessora = btree_find_successor(btree, rrnSubarvoreDireita);
-
-                int rrnSucessora = btree_nodeSearch_get_rrn(sucessora);
-                int indiceSucessora = btree_nodeSearch_get_indice(sucessora);
-
-                NodeB *nodeSucessora = btree_node_read_from_file_at_offset(btree, 17 + rrnSucessora * 53);
-
-                // Copia chave e ponteiro_chave da sucessora para a posicao da chave removida
-                btree_node_set_parChave(nodeRemove, indice, btree_node_get_chave(nodeSucessora, indiceSucessora), btree_node_get_ponteiro_chave(nodeSucessora, indiceSucessora));
-
-                // Grava o no interno modificado
-                fseek(btree, 17 + rrnEncontrado * 53, SEEK_SET);
-                btree_node_write_to_file(btree, nodeRemove);
-                free_btree_node(&nodeRemove);
-
-                // A remocao fisica acontece no no folha da sucessora
-                profundidade = btree_nodeSearch_get_profundidade(sucessora);
-                btree_nodeSearch_set_caminho(result, btree_nodeSearch_get_caminho(sucessora), profundidade * sizeof(int));
-                nodeRemove = nodeSucessora;
-                rrnParaEscrever = rrnSucessora;
-                indiceParaRemover = indiceSucessora;
-
-                free_search_result(&sucessora);
-            }
-            // Remove a chave
-            btree_node_remover_chave(nodeRemove, btree_nodeSearch_get_indice(result));
-            fseek(btree, 17 + btree_nodeSearch_get_rrn(result) * 53, SEEK_SET);
-            btree_node_write_to_file(btree, nodeRemove);
-
-            int nivelAtual = profundidade - 1;
-
-            // Verifica e trata underflow
-            while (btree_node_has_underflow(nodeRemove) && nivelAtual > 0)
-            {
-                int *caminho = btree_nodeSearch_get_caminho(result);
-                int rrnAtual = caminho[nivelAtual];
-                int rrnPai = caminho[nivelAtual - 1];
-
-                free_btree_node(&nodeRemove);
-
-                // Ordem: redistribuicao direita, esquerda, merge esquerda, merge direita
-                if (btree_redistribute_right(btree, rrnAtual, rrnPai) ||
-                    btree_redistribute_left(btree, rrnAtual, rrnPai) ||
-                    btree_merge_left(btree, rrnAtual, rrnPai) ||
-                    btree_merge_right(btree, rrnAtual, rrnPai))
-                {
-                    // Rele o pai para verificar se ele entrou em underflow
-                    nodeRemove = btree_node_read_from_file_at_offset(btree, 17 + rrnPai * 53);
-                    nivelAtual--;
-                }
-                else
-                {
-                    break;
-                }
-            }
-            NodeB *raiz = btree_node_read_from_file_at_offset(btree, 17 + noRaiz * 53);
-            if (btree_node_get_nroChaves(raiz) == 0)
-            {
-                int novoRrnRaiz = btree_node_get_ponteiro(raiz, 0);
-                remover_logicamente_no(btree, headerB, noRaiz);
-                btree_header_set_noRaiz(headerB, novoRrnRaiz);
-                btree_header_write_to_file(btree, headerB);
-                noRaiz = novoRrnRaiz;
-            }
-            free_btree_node(&raiz);
-            free_btree_node(&nodeRemove);
+           // Realiza a remocao na arvore
+            btree_remove_key(btree, headerB, &noRaiz, result, caminho);
             free_search_result(&result);
-            free(criterios);
-            continue;
         }
         // Caso não seja, usa busca como na funcionalidade 3 (sem a arvore B)
         else{
-            encontrou = search_records(bin, criterios, m, remove_register, ctx);
+            int caminho[8];
+            remove_btree_contexto(ctx, btree, headerB, &noRaiz);
+            encontrou = search_records(bin, criterios, m, remove_register_with_btree, ctx);
         }
 
         free(criterios);
     }
 
+    // Fechar tudo
     set_header_estacoes_unicas(bin, header);
     header_set_status(header, '1');
     header_write_to_file(bin, header);
@@ -890,4 +811,24 @@ int btree_fix_underflow(FILE *btree, int rrnFilho, int rrnPai)
 
     btree_merge_right(btree, rrnFilho, rrnPai);
     return rrnPai; // pai perdeu uma chave verificar underflow
+}
+
+void remove_register_with_btree(Record *r, int posRecord, Contexto *ctx){
+    remove_register(r, posRecord, ctx);
+
+    // Busca e remove da arvore B pela chave do registro
+    int chave = record_get_codEstacao(r);
+    FILE *btree = get_btree_from_context(ctx);
+    int *noRaiz = get_noRaiz_from_context(ctx);
+    int caminho[8];
+    NodeSearch *result = btree_search_recursive(btree, *noRaiz, -1, chave, caminho, 0);
+
+    if (!btree_nodeSearch_get_found(result)) {
+        free_search_result(&result);
+        return;
+    }
+
+    btree_remove_key(btree, get_headerB_from_context(ctx), noRaiz, result, caminho);
+
+    free_search_result(&result);
 }
