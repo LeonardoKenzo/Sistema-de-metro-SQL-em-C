@@ -732,9 +732,11 @@ void remove_btree(char *bin_filename, char *btree_filename)
             }
 
             // Faz a remocao do arquivo de registros
-            int posOffset = btree_node_get_ponteiro_chave(btree_node_read_from_file_at_offset(btree, 17 + btree_nodeSearch_get_rrn(result) * 53), btree_nodeSearch_get_indice(result));
+            NodeB *node = btree_node_read_from_file_at_offset(btree, 17 + btree_nodeSearch_get_rrn(result) * 53);
+            int posOffset = btree_node_get_ponteiro_chave(node, btree_nodeSearch_get_indice(result));
             Record *r = record_read_from_file_at_offset(bin, posOffset);
             remove_register(r, posOffset, ctx);
+            free_btree_node(&node);
             free_record(&r);
 
            // Realiza a remocao na arvore
@@ -795,22 +797,6 @@ void update_register(Record *r, int posRecord, Contexto *ctx)
     fseek(get_file_from_context(ctx), posRecord, SEEK_SET);
     record_write_to_file(get_file_from_context(ctx), r);
     pausar_busca(ctx);
-}
-
-// Resolve underflow em rrnFilho cujo pai e rrnPai e retorna o rrn que ficou apos a operacao
-int btree_fix_underflow(FILE *btree, int rrnFilho, int rrnPai)
-{
-    if (btree_redistribute_right(btree, rrnFilho, rrnPai))
-        return -1; // sem underflow a propagar
-
-    if (btree_redistribute_left(btree, rrnFilho, rrnPai))
-        return -1;
-
-    if (btree_merge_left(btree, rrnFilho, rrnPai))
-        return rrnPai; // pai perdeu uma chave verificar underflow
-
-    btree_merge_right(btree, rrnFilho, rrnPai);
-    return rrnPai; // pai perdeu uma chave verificar underflow
 }
 
 void remove_register_with_btree(Record *r, int posRecord, Contexto *ctx){

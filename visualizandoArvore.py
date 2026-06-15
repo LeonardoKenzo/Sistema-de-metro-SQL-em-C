@@ -3,6 +3,10 @@
 
 import struct
 
+import matplotlib
+
+matplotlib.use("TkAgg")
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import sys

@@ -92,6 +92,7 @@ void remover_logicamente_no(FILE *btree, HeaderBTree *headerB, int rrnNo){
     btree_node_write_to_file(btree, node);
     
     btree_header_set_topo(headerB, rrnNo);
+    btree_header_write_to_file(btree, headerB);
 
     free_btree_node(&node);
 }
@@ -150,16 +151,15 @@ void free_search_result(NodeSearch **result) {
     }
 }
 
-// Função de inserção
-bool btree_insert_recursive(FILE *btree, HeaderBTree *h, int rrn_atual, int chave_in, int ponteiro_in, 
-                            int *chave_pro, int *ponteiro_pro, int *filho_direito_pro) {
+// Funcao de insercao
+bool btree_insert_recursive(FILE *btree, HeaderBTree *h, int rrn_atual, int chave_in, int ponteiro_in, int *chave_pro, int *ponteiro_pro, int *filho_direito_pro) {
     if (rrn_atual == -1) {
         return false; 
     }
 
     NodeB *node = btree_node_read_from_file_at_offset(btree, 17 + rrn_atual * 53);
 
-    // Evita duplicados de chave primária
+    // Evita duplicados de chave primaria
     if (btree_node_buscar_chave(node, chave_in) != -1) {
         free_btree_node(&node);
         return false;
@@ -168,10 +168,9 @@ bool btree_insert_recursive(FILE *btree, HeaderBTree *h, int rrn_atual, int chav
     bool result_split = false;
 
     if (btree_node_get_tipoNo(node) == -1) {
-        // É uma folha, inserir direto
+        // Eh uma folha, inserir direto
         NodeB *novo_no = NULL;
-        result_split = btree_node_insert_and_split(node, chave_in, ponteiro_in, -1, 
-                                                   chave_pro, ponteiro_pro, &novo_no);
+        result_split = btree_node_insert_and_split(node, chave_in, ponteiro_in, -1, chave_pro, ponteiro_pro, &novo_no);
         
         if (result_split) {
             int rrn_novo = alocar_rrn_novo_no(btree, h);
@@ -181,7 +180,7 @@ bool btree_insert_recursive(FILE *btree, HeaderBTree *h, int rrn_atual, int chav
             *filho_direito_pro = rrn_novo; // Passa o novo RRN para cima
         }
     } else {
-        // Não é folha, desce pelo ponteiro filho adequado
+        // Nao eh folha, desce pelo ponteiro filho adequado
         int filho_rrn = btree_node_get_child_rrn(node, chave_in);
         
         int p_chave, p_ptr, p_filho;
@@ -194,8 +193,7 @@ bool btree_insert_recursive(FILE *btree, HeaderBTree *h, int rrn_atual, int chav
 
         // O filho sofreu um split e promoveu uma chave
         NodeB *novo_no = NULL;
-        result_split = btree_node_insert_and_split(node, p_chave, p_ptr, p_filho, 
-                                                   chave_pro, ponteiro_pro, &novo_no);
+        result_split = btree_node_insert_and_split(node, p_chave, p_ptr, p_filho, chave_pro, ponteiro_pro, &novo_no);
         
         if (result_split) {
             int rrn_novo = alocar_rrn_novo_no(btree, h);
@@ -219,7 +217,7 @@ void btree_insert(FILE *btree, HeaderBTree *h, int chave, int offset) {
     int noRaiz = btree_header_get_noRaiz(h);
 
     if (noRaiz == -1) {
-        // Árvore vazia, a primeira inserção cria a folha/raiz inicial
+        // Arvore vazia, a primeira insercao cria a folha/raiz inicial
         int rrn_novo = alocar_rrn_novo_no(btree, h);
         NodeB *raiz = create_btree_node(-1); // -1 = folha e raiz
         btree_node_inserir_chave(raiz, chave, offset, -1);
@@ -229,17 +227,16 @@ void btree_insert(FILE *btree, HeaderBTree *h, int chave, int offset) {
         free_btree_node(&raiz);
         
         btree_header_set_noRaiz(h, rrn_novo);
-        //btree_header_set_proxRRN(h, 1); | alocar_rrn_novo_no() já cuida de incrementar o proxRRN
         return;
     }
 
     int p_chave, p_ptr, p_filho;
     bool promoted = btree_insert_recursive(btree, h, noRaiz, chave, offset, &p_chave, &p_ptr, &p_filho);
 
-    // Se o último retorno para a raiz for true, a raiz da árvore explodiu e é preciso criar um novo topo
+    // Se o ultimo retorno para a raiz for true, a raiz da arvore explodiu e eh preciso criar um novo topo
     if (promoted) {
         int rrn_nova_raiz = alocar_rrn_novo_no(btree, h);
-        NodeB *nova_raiz = create_btree_node(0); // 0 = Raiz exclusiva (não-folha)
+        NodeB *nova_raiz = create_btree_node(0); // 0 = Raiz exclusiva (nao-folha)
         
         btree_node_inserir_chave(nova_raiz, p_chave, p_ptr, p_filho);
         bree_node_set_filho_inicial(nova_raiz, noRaiz); // O ponteiro 0 aponta para a raiz antiga
@@ -252,10 +249,16 @@ void btree_insert(FILE *btree, HeaderBTree *h, int chave, int offset) {
     }
 }
 
-NodeSearch *btree_find_successor(FILE *btree, int rrnAtual){
+NodeSearch *btree_find_successor(FILE *btree, int rrnAtual, int *caminhoPai, int profundidadePai) {
     int rrnPai = -1;
+    int caminhoTemp[8];
+    
+    memcpy(caminhoTemp, caminhoPai, profundidadePai * sizeof(int));
+    int profTemp = profundidadePai;
 
     while(rrnAtual != -1){
+        caminhoTemp[profTemp] = rrnAtual;
+        profTemp++;
 
         int byteOffset = 17 + rrnAtual * 53;
         NodeB *node = btree_node_read_from_file_at_offset(btree, byteOffset);
@@ -266,10 +269,15 @@ NodeSearch *btree_find_successor(FILE *btree, int rrnAtual){
         // Chegou em uma folha
         if(btree_node_get_tipoNo(node) == -1){
             free_btree_node(&node);
-            return create_btree_nodeSearch(true, rrnAtual, rrnPai, 0);
+            NodeSearch *result = create_btree_nodeSearch(true, rrnAtual, rrnPai, 0);
+            
+            // Grava o caminho completo e a profundidade no resultado
+            memcpy(result->caminho, caminhoTemp, profTemp * sizeof(int));
+            result->profundidade = profTemp;
+            return result;
         }
 
-        // Continua pelo filho mais à esquerda
+        // Continua pelo filho mais a esquerda
         rrnPai = rrnAtual;
         rrnAtual = btree_node_get_ponteiro(node, 0);
 
@@ -304,6 +312,7 @@ bool btree_redistribute_right(FILE *btree, int rrnFilho, int rrnPai){
 
     // Verificacao de underflow
     int minChaves = (btree_ordem() - 1) / 2;
+    int ChavesDireito = btree_node_get_nroChaves(nodeDireito);
     if(btree_node_get_nroChaves(nodeDireito) <= minChaves){
         free_btree_node(&nodePai);
         free_btree_node(&nodeUnderflow);
@@ -311,19 +320,45 @@ bool btree_redistribute_right(FILE *btree, int rrnFilho, int rrnPai){
         return false;
     }
     
-    // Insere a chave vinda do pai no no que estava em underflow
-    if(btree_node_get_tipoNo(nodeUnderflow) == -1)
-        btree_node_inserir_chave(nodeUnderflow, btree_node_get_chave(nodePai, indiceChavePai), btree_node_get_ponteiro_chave(nodePai, indiceChavePai), -1);
-    else
-        btree_node_inserir_chave(nodeUnderflow, btree_node_get_chave(nodePai, indiceChavePai), btree_node_get_ponteiro_chave(nodePai, indiceChavePai), btree_node_get_ponteiro(nodeDireito, 0));
-    
-    // Promove a primeira chave do no direito para o pai
-    btree_node_set_parChave(nodePai, indiceChavePai, btree_node_get_chave(nodeDireito, 0), btree_node_get_ponteiro_chave(nodeDireito, 0));
-    
-    // Corrige os ponteiros
-    int ponteiroSucessor = btree_node_get_ponteiro(nodeDireito, 1);
-    btree_node_remover_chave(nodeDireito, 0);
-    btree_node_set_ponteiro(nodeDireito, 0, ponteiroSucessor);
+    // Caso 1: O irmao da direita tem 2 chaves, entao sobram 1 para cada no
+    if (ChavesDireito == 2) {
+        if(btree_node_get_tipoNo(nodeUnderflow) == -1)
+            btree_node_inserir_chave(nodeUnderflow, btree_node_get_chave(nodePai, indiceChavePai), btree_node_get_ponteiro_chave(nodePai, indiceChavePai), -1);
+        else
+            btree_node_inserir_chave(nodeUnderflow, btree_node_get_chave(nodePai, indiceChavePai), btree_node_get_ponteiro_chave(nodePai, indiceChavePai), btree_node_get_ponteiro(nodeDireito, 0));
+        
+        // Promove a primeira chave do no direito para o pai
+        btree_node_set_parChave(nodePai, indiceChavePai, btree_node_get_chave(nodeDireito, 0), btree_node_get_ponteiro_chave(nodeDireito, 0));
+        
+        // Corrige os ponteiros do no direito
+        int ponteiroSucessor = btree_node_get_ponteiro(nodeDireito, 1);
+        btree_node_remover_chave(nodeDireito, 0);
+        btree_node_set_ponteiro(nodeDireito, 0, ponteiroSucessor);
+    } 
+
+    // Caso 2: O irmao da direita tem 3 chaves, entao esquerda fica com 2 chaves e o da direita com 1
+    else if (ChavesDireito == 3) {
+        // Move a chave do pai para o no da esquerda
+        if(btree_node_get_tipoNo(nodeUnderflow) == -1)
+            btree_node_inserir_chave(nodeUnderflow, btree_node_get_chave(nodePai, indiceChavePai), btree_node_get_ponteiro_chave(nodePai, indiceChavePai), -1);
+        else
+            btree_node_inserir_chave(nodeUnderflow, btree_node_get_chave(nodePai, indiceChavePai), btree_node_get_ponteiro_chave(nodePai, indiceChavePai), btree_node_get_ponteiro(nodeDireito, 0));
+        
+        // Move a primeira chave do no direito (indice 0) para o nó da esquerda
+        if(btree_node_get_tipoNo(nodeUnderflow) == -1)
+            btree_node_inserir_chave(nodeUnderflow, btree_node_get_chave(nodeDireito, 0), btree_node_get_ponteiro_chave(nodeDireito, 0), -1);
+        else
+            btree_node_inserir_chave(nodeUnderflow, btree_node_get_chave(nodeDireito, 0), btree_node_get_ponteiro_chave(nodeDireito, 0), btree_node_get_ponteiro(nodeDireito, 1));
+        
+        // Promove a segunda chave do no direito (indice 1) para o pai
+        btree_node_set_parChave(nodePai, indiceChavePai, btree_node_get_chave(nodeDireito, 1), btree_node_get_ponteiro_chave(nodeDireito, 1));
+        
+        // Remove as duas chaves que sairam do no direito e ajusta seu ponteiro inicial
+        int ponteiroSucessor = btree_node_get_ponteiro(nodeDireito, 2);
+        btree_node_remover_chave(nodeDireito, 0);
+        btree_node_remover_chave(nodeDireito, 0);
+        btree_node_set_ponteiro(nodeDireito, 0, ponteiroSucessor);
+    }
 
     fseek(btree, offsetPai, SEEK_SET);
     btree_node_write_to_file(btree, nodePai);
@@ -410,12 +445,13 @@ bool btree_redistribute_left(FILE *btree, int rrnFilho, int rrnPai){
     return true;
 }
 
-bool btree_merge_right(FILE *btree, int rrnFilho, int rrnPai) {
+bool btree_merge_right(FILE *btree, HeaderBTree *headerB, int rrnFilho, int rrnPai) {
     int offsetPai = 17 + rrnPai * 53, offsetFilhoUnderflow = 17 + rrnFilho * 53;
 
     NodeB* nodePai = btree_node_read_from_file_at_offset(btree, offsetPai);
     NodeB *nodeUnderflow = btree_node_read_from_file_at_offset(btree, offsetFilhoUnderflow);
     
+    // Verifica se o pai possui filho direito
     int indiceFilhoDireito = -1, indiceChavePai;
     for(int i = 0; i <= btree_node_get_nroChaves(nodePai); i++) {
         if(btree_node_get_ponteiro(nodePai, i) == rrnFilho) {
@@ -455,11 +491,8 @@ bool btree_merge_right(FILE *btree, int rrnFilho, int rrnPai) {
     btree_node_write_to_file(btree, nodeUnderflow);
 
     // Remove o nodedireito
-    HeaderBTree *headerB = create_btree_header();
-    btree_header_read_from_file(btree, headerB);
     remover_logicamente_no(btree, headerB, rrnDireito);
 
-    free_btree_header(&headerB);
     free_btree_node(&nodePai);
     free_btree_node(&nodeUnderflow);
     free_btree_node(&nodeDireito);
@@ -467,12 +500,13 @@ bool btree_merge_right(FILE *btree, int rrnFilho, int rrnPai) {
     return true;
 }
 
-bool btree_merge_left(FILE *btree, int rrnFilho, int rrnPai) {
+bool btree_merge_left(FILE *btree, HeaderBTree *headerB, int rrnFilho, int rrnPai) {
     int offsetPai = 17 + rrnPai * 53, offsetFilhoUnderflow = 17 + rrnFilho * 53;
 
     NodeB* nodePai = btree_node_read_from_file_at_offset(btree, offsetPai);
     NodeB *nodeUnderflow = btree_node_read_from_file_at_offset(btree, offsetFilhoUnderflow);
     
+    // Verifica se o pai possui filho esquerdo
     int indiceFilhoEsquerdo = -1, indiceChavePai;
     for(int i = 0; i <= btree_node_get_nroChaves(nodePai); i++) {
         if(btree_node_get_ponteiro(nodePai, i) == rrnFilho) {
@@ -512,11 +546,8 @@ bool btree_merge_left(FILE *btree, int rrnFilho, int rrnPai) {
     btree_node_write_to_file(btree, nodeEsquerdo);
 
     // Remove o nodeUnderflow
-    HeaderBTree *headerB = create_btree_header();
-    btree_header_read_from_file(btree, headerB);
     remover_logicamente_no(btree, headerB, rrnFilho);
 
-    free_btree_header(&headerB);
     free_btree_node(&nodePai);
     free_btree_node(&nodeUnderflow);
     free_btree_node(&nodeEsquerdo);
@@ -536,26 +567,43 @@ void btree_remove_key(FILE *btree, HeaderBTree *headerB, int *noRaiz, NodeSearch
     // Se nao eh folha, troca pela sucessora
     if (btree_node_get_tipoNo(nodeRemove) != -1) {
         int rrnSubarvoreDireita = btree_node_get_ponteiro(nodeRemove, indice + 1);
-        NodeSearch *sucessora = btree_find_successor(btree, rrnSubarvoreDireita);
 
-        int rrnSucessora = btree_nodeSearch_get_rrn(sucessora);
-        int indiceSucessora = btree_nodeSearch_get_indice(sucessora);
+        int rrnAtual = rrnSubarvoreDireita;
+        int rrnSucessora = rrnSubarvoreDireita;
+        int profundidadeOriginal = result->profundidade; 
+        
+        // Desce até o no folha mais a esquerda da subarvore direita
+        while (rrnAtual != -1) {
+            result->caminho[profundidadeOriginal] = rrnAtual;
+            profundidadeOriginal++;
+            
+            NodeB *nodeTmp = btree_node_read_from_file_at_offset(btree, 17 + rrnAtual * 53);
+            if (btree_node_get_tipoNo(nodeTmp) == -1) {
+                rrnSucessora = rrnAtual;
+                free_btree_node(&nodeTmp);
+                break;
+            }
+            rrnAtual = btree_node_get_ponteiro(nodeTmp, 0);
+            free_btree_node(&nodeTmp);
+        }
 
+        result->profundidade = profundidadeOriginal;
+        result->rrn = rrnSucessora;
+        result->indice = 0; // O sucessor imediato eh sempre a primeira chave (indice 0)
+        
         NodeB *nodeSucessora = btree_node_read_from_file_at_offset(btree, 17 + rrnSucessora * 53);
 
-        btree_node_set_parChave(nodeRemove, indice, btree_node_get_chave(nodeSucessora, indiceSucessora), btree_node_get_ponteiro_chave(nodeSucessora, indiceSucessora));
+        // Substitui a chave interna pela chave do no folha sucessor
+        btree_node_set_parChave(nodeRemove, indice, btree_node_get_chave(nodeSucessora, 0), btree_node_get_ponteiro_chave(nodeSucessora, 0));
 
         fseek(btree, 17 + rrnEncontrado * 53, SEEK_SET);
         btree_node_write_to_file(btree, nodeRemove);
         free_btree_node(&nodeRemove);
 
-        profundidade = btree_nodeSearch_get_profundidade(sucessora);
-        btree_nodeSearch_set_caminho(result, btree_nodeSearch_get_caminho(sucessora), profundidade * sizeof(int));
         nodeRemove = nodeSucessora;
         rrnParaEscrever = rrnSucessora;
-        indiceParaRemover = indiceSucessora;
-
-        free_search_result(&sucessora);
+        indiceParaRemover = 0;
+        profundidade = profundidadeOriginal;
     }
 
     // Remove a chave do no folha
@@ -566,18 +614,18 @@ void btree_remove_key(FILE *btree, HeaderBTree *headerB, int *noRaiz, NodeSearch
     // Propaga underflow
     int nivelAtual = profundidade - 1;
     while (btree_node_has_underflow(nodeRemove) && nivelAtual > 0) {
-        int *cam     = btree_nodeSearch_get_caminho(result);
-        int rrnAtual = cam[nivelAtual];
-        int rrnPai   = cam[nivelAtual - 1];
+        int *caminhoResultado = btree_nodeSearch_get_caminho(result);
+        int rrnAtual = caminhoResultado[nivelAtual];
+        int rrnPai = caminhoResultado[nivelAtual - 1];
 
         free_btree_node(&nodeRemove);
 
         if (btree_redistribute_right(btree, rrnAtual, rrnPai) ||
-            btree_redistribute_left(btree, rrnAtual, rrnPai)  ||
-            btree_merge_left(btree, rrnAtual, rrnPai)         ||
-            btree_merge_right(btree, rrnAtual, rrnPai)) {
-            nodeRemove = btree_node_read_from_file_at_offset(btree, 17 + rrnPai * 53);
-            nivelAtual--;
+            btree_redistribute_left(btree, rrnAtual, rrnPai) ||
+            btree_merge_left(btree, headerB, rrnAtual, rrnPai) ||
+            btree_merge_right(btree, headerB, rrnAtual, rrnPai)) {
+                nodeRemove = btree_node_read_from_file_at_offset(btree, 17 + rrnPai * 53);
+                nivelAtual--;
         } 
         else {
             break;

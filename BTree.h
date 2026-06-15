@@ -28,12 +28,12 @@
     void btree_insert(FILE *btree, HeaderBTree *h, int chave, int offset);
 
     // Remocao
-    NodeSearch *btree_find_successor(FILE *btree, int rrnAtual);
+    NodeSearch *btree_find_successor(FILE *btree, int rrnAtual, int *caminhoPai, int profundidadePai);
     void btree_remove_key(FILE *btree, HeaderBTree *headerB, int *noRaiz, NodeSearch *result, int caminho[8]);
 
     // Funções de tratamento de underflow
     bool btree_redistribute_right(FILE *btree, int rrnFilho, int rrnPai);
     bool btree_redistribute_left(FILE *btree, int rrnFilho, int rrnPai);
-    bool btree_merge_right(FILE *btree, int rrnFilho, int rrnPai);
-    bool btree_merge_left(FILE *btree, int rrnFilho, int rrnPai);
+    bool btree_merge_right(FILE *btree, HeaderBTree *headerB, int rrnFilho, int rrnPai);
+    bool btree_merge_left(FILE *btree,HeaderBTree *headerB, int rrnFilho, int rrnPai);
 #endif
