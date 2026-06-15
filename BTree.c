@@ -637,6 +637,19 @@ void btree_remove_key(FILE *btree, HeaderBTree *headerB, int *noRaiz, NodeSearch
     if (btree_node_get_nroChaves(raiz) == 0) {
         int novoRrnRaiz = btree_node_get_ponteiro(raiz, 0);
         remover_logicamente_no(btree, headerB, *noRaiz);
+
+        // Se nao ficou totalmente vazia
+        if (novoRrnRaiz != -1) {
+            NodeB *novaRaiz = btree_node_read_from_file_at_offset(btree, 17 + novoRrnRaiz * 53);
+            
+            // Se o no era intermediario, ele agora vira a raiz da arvore. Se for folha ele permanece como folha e raiz
+            if (btree_node_get_tipoNo(novaRaiz) == 1) {
+                btree_node_set_tipoNo(novaRaiz, 0);
+                fseek(btree, 17 + novoRrnRaiz * 53, SEEK_SET);
+                btree_node_write_to_file(btree, novaRaiz);
+            }
+            free_btree_node(&novaRaiz);
+        }
         btree_header_set_noRaiz(headerB, novoRrnRaiz);
         btree_header_write_to_file(btree, headerB);
         *noRaiz = novoRrnRaiz;
