@@ -710,6 +710,8 @@ void remove_btree(char *bin_filename, char *btree_filename)
 
     Header *header = create_header_register();
     header_read_from_file(bin, header);
+    btree_header_set_status(header, '0');
+    header_write_to_file(bin, header);
 
     // Contexto de remocao para o arquivo de registro
     Contexto *ctx = criar_contexto(bin, header, NULL, 0);
