@@ -688,7 +688,7 @@ bool insert_btree(char *bin_filename, char *btree_filename)
     return true;
 }
 // Funcionalidade 10 ------------------------------------------------------
-void remove_btree(char *bin_filename, char *btree_filename)
+bool remove_btree(char *bin_filename, char *btree_filename)
 {
     FILE *bin = fopen(bin_filename, "r+b");
     FILE *btree = fopen(btree_filename, "r+b");
@@ -700,7 +700,7 @@ void remove_btree(char *bin_filename, char *btree_filename)
             fclose(bin);
         if (btree)
             fclose(btree);
-        return;
+        return false;
     }
 
     HeaderBTree *headerB = create_btree_header();
@@ -779,7 +779,66 @@ void remove_btree(char *bin_filename, char *btree_filename)
     free(ctx);
     fclose(bin);
     fclose(btree);
+
+    return true;
 }
+
+// Funcionalidade 13 ----------------------------------------------------
+bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filename){
+    FILE *bin = fopen(bin_filename, "rb");
+    FILE *order = fopen(order_filename, "w+b");
+
+    if(!bin || !order || status_esta_instavel(bin)){
+        printf("Falha no processamento do arquivo.\n");
+        if(bin) fclose(bin);
+        if(order) fclose(order);
+        return false;
+    }
+
+    Header *header = create_header_register();
+    header_read_from_file(bin, header);
+
+    Record *record;
+    char removido;
+    int RRN = 0, posRecord = 0;
+
+    // Percorre todo o arquivo binario para criar o indice de arvore B
+    fseek(bin, 17, SEEK_SET);
+    while (fread(&removido, sizeof(char), 1, bin) == 1)
+    {
+        // Ignora os registros removidos
+        if (removido == '1')
+        {
+            RRN++;
+            posRecord = 17 + RRN * 80;
+            fseek(bin, posRecord, SEEK_SET);
+            continue;
+        }
+
+        if (strncmp(campoOrdenacao, "codEstacao", 10) == 0) {
+            
+        } 
+        else if (strncmp(campoOrdenacao, "codProxEstacao", 14) == 0) {
+
+        } 
+
+        RRN++;
+        posRecord = 17 + RRN * 80;
+        fseek(bin, posRecord, SEEK_SET);
+
+        free_record(&record);
+    }
+
+    free_header_register(&header);
+
+    fclose(bin);
+    fclose(order);
+
+    return true;
+}
+
+// Funcionalidade 14 ----------------------------------------
+
 
 // Funcoes auxiliares -----------------------------------------------------
 

@@ -20,5 +20,8 @@
     bool create_btree(char *bin_filename, char *btree_filename);    
     void search_btree(char *bin_filename, char *btree_filename);
     bool insert_btree(char *bin_filename, char *btree_filename);
-    void remove_btree(char *bin_filename, char *btree_filename);
+    bool remove_btree(char *bin_filename, char *btree_filename);
+
+    bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filename);
+
 #endif

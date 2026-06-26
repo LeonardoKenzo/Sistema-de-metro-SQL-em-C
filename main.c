@@ -66,8 +66,9 @@ int main(void){
         // funcionalidade 7
         char arq_bin[100], arq_btree[100];
         scanf("%s %s", arq_bin, arq_btree);
-        create_btree(arq_bin, arq_btree);
-        BinarioNaTela(arq_btree);
+        if(create_btree(arq_bin, arq_btree)){
+            BinarioNaTela(arq_btree);
+        }
         break;
     }
     case 8:{
@@ -91,10 +92,21 @@ int main(void){
         // funcionalidade 10
         char arq_bin[100], arq_btree[100];
         scanf("%s %s", arq_bin, arq_btree);
-        remove_btree(arq_bin, arq_btree);
-        BinarioNaTela(arq_bin);
-        BinarioNaTela(arq_btree);
+        if(remove_btree(arq_bin, arq_btree)){
+            BinarioNaTela(arq_bin);
+            BinarioNaTela(arq_btree);
+        }
         break;
+    }
+    case 13:{
+        // funcionalidade 13
+        char arq_bin[100], campoOrdenacao[50], arq_order[100];
+        scanf("%s ", arq_bin);
+        ScanQuoteString(campoOrdenacao);
+        scanf("%s ", arq_order);
+        if(create_order_by(arq_bin, campoOrdenacao, arq_order)){
+            BinarioNaTela(arq_order);
+        }
     }
     }   
     return 0;
