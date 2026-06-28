@@ -108,6 +108,15 @@ int main(void){
             BinarioNaTela(arq_order);
         }
     }
+    case 14:{
+        // funcionalidade 14
+        char arq_bin1[100], joinCampo1[50], arq_bin2[100], joinCampo2[50];
+        scanf("%s ", arq_bin1);
+        ScanQuoteString(joinCampo1);
+        scanf("%s ", arq_bin2);
+        ScanQuoteString(joinCampo2);
+        join_order_by(arq_bin1, joinCampo1, arq_bin2, joinCampo2);
+    }
     }   
     return 0;
 }

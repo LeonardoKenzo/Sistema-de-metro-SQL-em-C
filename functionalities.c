@@ -11,11 +11,13 @@
 #include <string.h>
 #include <stdbool.h>
 
-// Funcoes para as funcionalidades 2, 4, 6 e 10
+// Funcoes para as funcionalidades 2, 4, 6, 10 e 13
 void print_register(Record *r, int posRecord, Contexto *ctx);
 void remove_register(Record *r, int posRecord, Contexto *ctx);
 void update_register(Record *r, int posRecord, Contexto *ctx);
 void remove_register_with_btree(Record *r, int posRecord, Contexto *ctx);
+Record *comparar_record_codEstacao(Record *a, Record *b);
+Record *comparar_record_codProxEstacao(Record *a, Record *b);
 
 // Funcionalidade 1 ------------------------------------------
 bool create_table(char *csv_filename, char *bin_filename)
@@ -710,7 +712,7 @@ bool remove_btree(char *bin_filename, char *btree_filename)
 
     Header *header = create_header_register();
     header_read_from_file(bin, header);
-    btree_header_set_status(header, '0');
+    header_set_status(header, '0');
     header_write_to_file(bin, header);
 
     // Contexto de remocao para o arquivo de registro
@@ -797,10 +799,18 @@ bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filen
 
     Header *header = create_header_register();
     header_read_from_file(bin, header);
+    int quant_register = header_get_nroEstacoes(header);
 
     Record *record;
+    Record **record_list = (Record **)malloc(quant_register * sizeof(Record *));
+    if(!record_list){
+        free_header_register(&header);
+        fclose(bin);
+        fclose(order);
+        return false;
+    }
     char removido;
-    int RRN = 0, posRecord = 0;
+    int RRN = 0, posRecord = 0, quant_record = 0;
 
     // Percorre todo o arquivo binario para criar o indice de arvore B
     fseek(bin, 17, SEEK_SET);
@@ -815,19 +825,38 @@ bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filen
             continue;
         }
 
-        if (strncmp(campoOrdenacao, "codEstacao", 10) == 0) {
-            
-        } 
-        else if (strncmp(campoOrdenacao, "codProxEstacao", 14) == 0) {
+        // Adiciona o registro na lista em memoria RAM
+        posRecord = 17 + RRN * 80;
+        fseek(bin, posRecord, SEEK_SET);
+        record = record_read_from_file(bin);
+        record_list[quant_record] = record;
+        quant_record++;
 
-        } 
+        if(quant_record > quant_register){
+            record_list = realloc(record_list, (quant_register * 2) * sizeof(Record *));
+            quant_register *= 2;
+        }
 
         RRN++;
         posRecord = 17 + RRN * 80;
         fseek(bin, posRecord, SEEK_SET);
-
-        free_record(&record);
     }
+
+    // Ordena o vetor
+    if (strncmp(campoOrdenacao, "codEstacao", 10) == 0) {
+        //qsort(record_list, quant_record, sizeof(Record *) ,comparar_record_codEstacao);
+    } 
+    else if (strncmp(campoOrdenacao, "codProxEstacao", 14) == 0) {
+        //qsort(record_list, quant_record, sizeof(Record *) ,comparar_record_codProxEstacao);
+    } 
+
+    // Escreve no novo arquivo binario
+    header_write_to_file(order, header);
+    for(int i = 0; i < quant_record; i++){
+        record_write_to_file(order, record_list[i]);
+        free_record(&(record_list[i]));
+    }
+    free(record_list);
 
     free_header_register(&header);
 
@@ -838,7 +867,22 @@ bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filen
 }
 
 // Funcionalidade 14 ----------------------------------------
+void join_order_by(char *bin_filename1, char *joinCampo1, char *bin_filename2, char *joinCampo2){
+    FILE *bin1 = fopen(bin_filename1, "rb");
+    FILE *bin2 = fopen(bin_filename2, "rb");
 
+    if(!bin1 || !bin2 || status_esta_instavel(bin1) || status_esta_instavel(bin2)){
+        printf("Falha no processamento do arquivo.\n");
+        if(bin1) fclose(bin1);
+        if(bin2) fclose(bin2);
+        return;
+    }
+
+
+
+    fclose(bin1);
+    fclose(bin2);
+}
 
 // Funcoes auxiliares -----------------------------------------------------
 
@@ -889,4 +933,18 @@ void remove_register_with_btree(Record *r, int posRecord, Contexto *ctx){
     btree_remove_key(btree, get_headerB_from_context(ctx), noRaiz, result, caminho);
 
     free_search_result(&result);
+}
+
+Record *comparar_record_codEstacao(Record *a, Record *b){
+    if (record_get_codEstacao(a) == 0 && record_get_codEstacao(b) == 0) return a;
+    if (record_get_codEstacao(a) == 0) return b;
+    if (record_get_codEstacao(b) == 0) return a;
+    return (record_get_codEstacao(a) <= record_get_codEstacao(b)) ? a : b;
+}
+
+Record *comparar_record_codProxEstacao(Record *a, Record *b){
+    if (record_get_codProxEstacao(a) == 0 && record_get_codProxEstacao(b) == 0) return a;
+    if (record_get_codProxEstacao(a) == 0) return b;
+    if (record_get_codProxEstacao(b) == 0) return a;
+    return (record_get_codProxEstacao(a) <= record_get_codProxEstacao(b)) ? a : b;
 }

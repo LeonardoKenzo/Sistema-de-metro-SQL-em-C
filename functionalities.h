@@ -23,5 +23,6 @@
     bool remove_btree(char *bin_filename, char *btree_filename);
 
     bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filename);
+    void join_order_by(char *bin_filename1, char *joinCampo1, char *bin_filename2, char *joinCampo2);
 
 #endif
