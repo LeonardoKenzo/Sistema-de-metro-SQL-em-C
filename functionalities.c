@@ -18,6 +18,7 @@ void update_register(Record *r, int posRecord, Contexto *ctx);
 void remove_register_with_btree(Record *r, int posRecord, Contexto *ctx);
 Record *comparar_record_codEstacao(Record *a, Record *b);
 Record *comparar_record_codProxEstacao(Record *a, Record *b);
+void print_join(Record *r1, Record *r2);
 
 // Funcionalidade 1 ------------------------------------------
 bool create_table(char *csv_filename, char *bin_filename)
@@ -785,6 +786,179 @@ bool remove_btree(char *bin_filename, char *btree_filename)
     return true;
 }
 
+// Funcionalidade 11
+void nested_loop_join(char *bin_filename1, char *campo1, char *bin_filename2, char *campo2) {
+    FILE *bin1 = fopen(bin_filename1, "rb");
+    FILE *bin2 = fopen(bin_filename2, "rb");
+
+    if (!bin1 || !bin2 || status_esta_instavel(bin1) || status_esta_instavel(bin2)) {
+        printf("Falha no processamento do arquivo.\n");
+        if (bin1) fclose(bin1);
+        if (bin2) fclose(bin2);
+        return;
+    }
+
+    bool encontrou_algum = false;
+    
+    // Loop para percorre o arquivo 1
+    fseek(bin1, 17, SEEK_SET);
+    char removido1;
+    int rrn1 = 0;
+
+    while (fread(&removido1, sizeof(char), 1, bin1) == 1) {
+        if (removido1 == '1') {
+            rrn1++;
+            fseek(bin1, 17 + rrn1 * 80, SEEK_SET);
+            continue;
+        }
+
+        fseek(bin1, 17 + rrn1 * 80, SEEK_SET);
+        Record *r1 = record_read_from_file(bin1);
+        if (r1 == NULL) {
+            rrn1++;
+            continue;
+        }
+
+        int codProx = record_get_codProxEstacao(r1);
+
+        // Loop para percorrer o arquivo 2
+        if (codProx != -1) {
+            fseek(bin2, 17, SEEK_SET);
+            char removido2;
+            int rrn2 = 0;
+            
+            while (fread(&removido2, sizeof(char), 1, bin2) == 1) {
+                if (removido2 == '1') {
+                    rrn2++;
+                    fseek(bin2, 17 + rrn2 * 80, SEEK_SET);
+                    continue;
+                }
+
+                fseek(bin2, 17 + rrn2 * 80, SEEK_SET);
+                Record *r2 = record_read_from_file(bin2);
+                if (r2 == NULL) {
+                    rrn2++;
+                    continue;
+                }
+
+                // Condição de Junção
+                if (record_get_codEstacao(r2) == codProx) {
+                    print_join(r1, r2);
+                    encontrou_algum = true;
+                }
+
+                free_record(&r2);
+                rrn2++;
+                fseek(bin2, 17 + rrn2 * 80, SEEK_SET);
+            }
+        }
+
+        free_record(&r1);
+        rrn1++;
+        fseek(bin1, 17 + rrn1 * 80, SEEK_SET);
+    }
+
+    if (!encontrou_algum) {
+        printf("Registro inexistente.\n");
+    }
+
+    fclose(bin1);
+    fclose(bin2);
+}
+
+// Funcionalidade 12
+void single_loop_join(char *bin_filename1, char *campo1, char *bin_filename2, char *campo2, char *btree_filename) {
+    FILE *bin1 = fopen(bin_filename1, "rb");
+    FILE *bin2 = fopen(bin_filename2, "rb");
+    FILE *btree = fopen(btree_filename, "rb");
+
+    HeaderBTree *headerB = NULL;
+    bool estavel = true;
+
+    // Checagens
+    if (!bin1 || !bin2 || !btree || status_esta_instavel(bin1) || status_esta_instavel(bin2)) {
+        estavel = false;
+    } else {
+        headerB = create_btree_header();
+        btree_header_read_from_file(btree, headerB);
+        if (btree_header_get_status(headerB) == '0') estavel = false;
+    }
+
+    if (!estavel) {
+        printf("Falha no processamento do arquivo.\n");
+        if (bin1) fclose(bin1);
+        if (bin2) fclose(bin2);
+        if (btree) fclose(btree);
+        if (headerB) free_btree_header(&headerB);
+        return;
+    }
+
+    int noRaiz = btree_header_get_noRaiz(headerB);
+    bool encontrou_algum = false;
+
+    // Loop para percorrer o arquivo 1
+    fseek(bin1, 17, SEEK_SET);
+    char removido1;
+    int rrn1 = 0;
+
+    while (fread(&removido1, sizeof(char), 1, bin1) == 1) {
+        if (removido1 == '1') {
+            rrn1++;
+            fseek(bin1, 17 + rrn1 * 80, SEEK_SET);
+            continue;
+        }
+
+        fseek(bin1, 17 + rrn1 * 80, SEEK_SET);
+        Record *r1 = record_read_from_file(bin1);
+        if (r1 == NULL) {
+            rrn1++;
+            continue;
+        }
+
+        int codProx = record_get_codProxEstacao(r1);
+
+        // Busca o codProxEstacao correspondente na Árvore-B (condição de junção)
+        if (codProx != -1) {
+            int caminho[8];
+            NodeSearch *result = btree_search_recursive(btree, noRaiz, -1, codProx, caminho, 0);
+
+            if (btree_nodeSearch_get_found(result)) {
+                int rrn = btree_nodeSearch_get_rrn(result);
+                int indice = btree_nodeSearch_get_indice(result);
+
+                NodeB *node = btree_node_read_from_file_at_offset(btree, 17 + rrn * 53);
+                int offset2 = btree_node_get_ponteiro_chave(node, indice);
+                free_btree_node(&node);
+
+                if (offset2 != -1) {
+                    fseek(bin2, offset2, SEEK_SET);
+                    Record *r2 = record_read_from_file(bin2);
+                    
+                    if (r2 != NULL && record_get_removido(r2) == '0') {
+                        print_join(r1, r2);
+                        encontrou_algum = true;
+                    }
+                    free_record(&r2);
+                }
+            }
+            free_search_result(&result);
+        }
+
+        free_record(&r1);
+        rrn1++;
+        fseek(bin1, 17 + rrn1 * 80, SEEK_SET);
+    }
+
+    if (!encontrou_algum) {
+        printf("Registro inexistente.\n");
+    }
+
+    fclose(bin1);
+    fclose(bin2);
+    fclose(btree);
+    free_btree_header(&headerB);
+}
+
 // Funcionalidade 13 ----------------------------------------------------
 bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filename){
     FILE *bin = fopen(bin_filename, "rb");
@@ -947,4 +1121,30 @@ Record *comparar_record_codProxEstacao(Record *a, Record *b){
     if (record_get_codProxEstacao(a) == 0) return b;
     if (record_get_codProxEstacao(b) == 0) return a;
     return (record_get_codProxEstacao(a) <= record_get_codProxEstacao(b)) ? a : b;
+}
+
+// Funcao auxiliar para imprimir o resultado da junção
+void print_join(Record *r1, Record *r2) {
+    // codEstacao (de r1)
+    printf("%d ", record_get_codEstacao(r1));
+
+    // nomeEstacao (de r1)
+    char *nome1 = record_get_nomeEstacao(r1);
+    if (nome1 == NULL || strlen(nome1) == 0) printf("NULO ");
+    else printf("%s ", nome1);
+
+    // nomeLinha (de r1)
+    char *linha1 = record_get_nomeLinha(r1);
+    if (linha1 == NULL || strlen(linha1) == 0) printf("NULO ");
+    else printf("%s ", linha1);
+
+    // codProxEstacao (de r1)
+    int codProx = record_get_codProxEstacao(r1);
+    if (codProx == -1) printf("NULO ");
+    else printf("%d ", codProx);
+
+    // nomeProxEstacao (campo recuperado do r2 por meio da junção)
+    char *nome2 = record_get_nomeEstacao(r2);
+    if (nome2 == NULL || strlen(nome2) == 0) printf("NULO\n");
+    else printf("%s\n", nome2);
 }

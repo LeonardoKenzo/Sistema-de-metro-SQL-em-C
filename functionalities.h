@@ -22,6 +22,8 @@
     bool insert_btree(char *bin_filename, char *btree_filename);
     bool remove_btree(char *bin_filename, char *btree_filename);
 
+    void nested_loop_join(char *bin_filename1, char *campo1, char *bin_filename2, char *campo2);
+    void single_loop_join(char *bin_filename1, char *campo1, char *bin_filename2, char *campo2, char *btree_filename);
     bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filename);
     void join_order_by(char *bin_filename1, char *joinCampo1, char *bin_filename2, char *joinCampo2);
 

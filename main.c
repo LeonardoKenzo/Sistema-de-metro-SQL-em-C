@@ -98,6 +98,20 @@ int main(void){
         }
         break;
     }
+    case 11: {
+        // funcionalidade 11
+        char arq_bin1[100], campo1[50], arq_bin2[100], campo2[50];
+        scanf("%s %s %s %s", arq_bin1, campo1, arq_bin2, campo2);
+        nested_loop_join(arq_bin1, campo1, arq_bin2, campo2);
+        break;
+    }
+    case 12: {
+        // funcionalidade 12
+        char arq_bin1[100], campo1[50], arq_bin2[100], campo2[50], arq_btree[100];
+        scanf("%s %s %s %s %s", arq_bin1, campo1, arq_bin2, campo2, arq_btree);
+        single_loop_join(arq_bin1, campo1, arq_bin2, campo2, arq_btree);
+        break;
+    }
     case 13:{
         // funcionalidade 13
         char arq_bin[100], campoOrdenacao[50], arq_order[100];
