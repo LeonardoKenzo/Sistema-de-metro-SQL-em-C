@@ -806,12 +806,14 @@ void nested_loop_join(char *bin_filename1, char *campo1, char *bin_filename2, ch
     int rrn1 = 0;
 
     while (fread(&removido1, sizeof(char), 1, bin1) == 1) {
+        // Registro Removido
         if (removido1 == '1') {
             rrn1++;
             fseek(bin1, 17 + rrn1 * 80, SEEK_SET);
             continue;
         }
 
+        // Registro Invalido
         fseek(bin1, 17 + rrn1 * 80, SEEK_SET);
         Record *r1 = record_read_from_file(bin1);
         if (r1 == NULL) {
@@ -922,14 +924,18 @@ void single_loop_join(char *bin_filename1, char *campo1, char *bin_filename2, ch
             int caminho[8];
             NodeSearch *result = btree_search_recursive(btree, noRaiz, -1, codProx, caminho, 0);
 
+            // Se encontrado na árvore-B executa
             if (btree_nodeSearch_get_found(result)) {
+                // Recupera rrn e indice do resultado da busca
                 int rrn = btree_nodeSearch_get_rrn(result);
                 int indice = btree_nodeSearch_get_indice(result);
 
+                // Recupera o nó e dps a chave
                 NodeB *node = btree_node_read_from_file_at_offset(btree, 17 + rrn * 53);
                 int offset2 = btree_node_get_ponteiro_chave(node, indice);
                 free_btree_node(&node);
 
+                // Lê o registro no arquivo e realiza o join se válido
                 if (offset2 != -1) {
                     fseek(bin2, offset2, SEEK_SET);
                     Record *r2 = record_read_from_file(bin2);
