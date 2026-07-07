@@ -1,3 +1,0 @@
-9 estacao.bin indice.bin 2
-99 "Estacao Teste" 1 "Linha Teste" NULO NULO NULO NULO
-88 "Nova Estacao" 2 "Nova Linha" NULO NULO NULO NULO

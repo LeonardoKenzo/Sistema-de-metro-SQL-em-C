@@ -1011,7 +1011,7 @@ bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filen
         record_list[quant_record] = record;
         quant_record++;
 
-        if(quant_record > quant_register){
+        if(quant_record >= quant_register){
             record_list = realloc(record_list, (quant_register * 2) * sizeof(Record *));
             quant_register *= 2;
         }
@@ -1080,7 +1080,7 @@ void join_order_by(char *bin_filename1, char *joinCampo1, char *bin_filename2, c
         record_list[quant_record] = record;
         quant_record++;
 
-        if(quant_record > quant_register){
+        if(quant_record >= quant_register){
             record_list = realloc(record_list, (quant_register * 2) * sizeof(Record *));
             quant_register *= 2;
         }
@@ -1117,7 +1117,7 @@ void join_order_by(char *bin_filename1, char *joinCampo1, char *bin_filename2, c
         record_list2[quant_record2] = record;
         quant_record2++;
 
-        if(quant_record2 > quant_register2){
+        if(quant_record2 >= quant_register2){
             record_list2 = realloc(record_list2, (quant_register2 * 2) * sizeof(Record *));
             quant_register2 *= 2;
         }

@@ -1,1 +1,0 @@
-7 estacao.bin indice.bin

@@ -115,9 +115,7 @@ int main(void){
     case 13:{
         // funcionalidade 13
         char arq_bin[100], campoOrdenacao[50], arq_order[100];
-        scanf("%s ", arq_bin);
-        ScanQuoteString(campoOrdenacao);
-        scanf("%s ", arq_order);
+        scanf("%s %s %s", arq_bin, campoOrdenacao, arq_order);
         if(create_order_by(arq_bin, campoOrdenacao, arq_order)){
             BinarioNaTela(arq_order);
         }
@@ -126,10 +124,7 @@ int main(void){
     case 14:{
         // funcionalidade 14
         char arq_bin1[100], joinCampo1[50], arq_bin2[100], joinCampo2[50];
-        scanf("%s ", arq_bin1);
-        ScanQuoteString(joinCampo1);
-        scanf("%s ", arq_bin2);
-        ScanQuoteString(joinCampo2);
+        scanf("%s %s %s %s", arq_bin1, joinCampo1, arq_bin2, joinCampo2);
         join_order_by(arq_bin1, joinCampo1, arq_bin2, joinCampo2);
         break;
     }
