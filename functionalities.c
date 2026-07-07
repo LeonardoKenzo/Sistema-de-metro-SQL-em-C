@@ -16,9 +16,9 @@ void print_register(Record *r, int posRecord, Contexto *ctx);
 void remove_register(Record *r, int posRecord, Contexto *ctx);
 void update_register(Record *r, int posRecord, Contexto *ctx);
 void remove_register_with_btree(Record *r, int posRecord, Contexto *ctx);
-Record *comparar_record_codEstacao(Record *a, Record *b);
-Record *comparar_record_codProxEstacao(Record *a, Record *b);
 void print_join(Record *r1, Record *r2);
+void mergeSort(Record **vetor, int esquerda, int direita, char *campoOrdenacao);
+void merge_sort_auxiliar(Record **vetor, int esquerda, int meio, int direita, char *campoOrdenacao);
 
 // Funcionalidade 1 ------------------------------------------
 bool create_table(char *csv_filename, char *bin_filename)
@@ -992,7 +992,6 @@ bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filen
     char removido;
     int RRN = 0, posRecord = 0, quant_record = 0;
 
-    // Percorre todo o arquivo binario para criar o indice de arvore B
     fseek(bin, 17, SEEK_SET);
     while (fread(&removido, sizeof(char), 1, bin) == 1)
     {
@@ -1023,12 +1022,7 @@ bool create_order_by(char *bin_filename, char *campoOrdenacao, char *order_filen
     }
 
     // Ordena o vetor
-    if (strncmp(campoOrdenacao, "codEstacao", 10) == 0) {
-        //qsort(record_list, quant_record, sizeof(Record *) ,comparar_record_codEstacao);
-    } 
-    else if (strncmp(campoOrdenacao, "codProxEstacao", 14) == 0) {
-        //qsort(record_list, quant_record, sizeof(Record *) ,comparar_record_codProxEstacao);
-    } 
+    mergeSort(record_list, 0, quant_record - 1, campoOrdenacao);
 
     // Escreve no novo arquivo binario
     header_write_to_file(order, header);
@@ -1058,7 +1052,139 @@ void join_order_by(char *bin_filename1, char *joinCampo1, char *bin_filename2, c
         return;
     }
 
+    Header *header = create_header_register();
+    header_read_from_file(bin1, header);
+    int quant_register = header_get_nroEstacoes(header);
 
+    Record *record;
+    Record **record_list = (Record **)malloc(quant_register * sizeof(Record *));
+    char removido;
+    int RRN = 0, posRecord = 0, quant_record = 0;
+
+    fseek(bin1, 17, SEEK_SET);
+    while (fread(&removido, sizeof(char), 1, bin1) == 1)
+    {
+        // Ignora os registros removidos
+        if (removido == '1')
+        {
+            RRN++;
+            posRecord = 17 + RRN * 80;
+            fseek(bin1, posRecord, SEEK_SET);
+            continue;
+        }
+
+        // Adiciona o registro na lista em memoria RAM
+        posRecord = 17 + RRN * 80;
+        fseek(bin1, posRecord, SEEK_SET);
+        record = record_read_from_file(bin1);
+        record_list[quant_record] = record;
+        quant_record++;
+
+        if(quant_record > quant_register){
+            record_list = realloc(record_list, (quant_register * 2) * sizeof(Record *));
+            quant_register *= 2;
+        }
+
+        RRN++;
+        posRecord = 17 + RRN * 80;
+        fseek(bin1, posRecord, SEEK_SET);
+    }
+
+    // Faz o mesmo para o bin2
+    Header *header2 = create_header_register();
+    header_read_from_file(bin2, header2);
+    int quant_register2 = header_get_nroEstacoes(header2);
+
+    Record **record_list2 = (Record **)malloc(quant_register2 * sizeof(Record *));
+    int RRN2 = 0, posRecord2 = 0, quant_record2 = 0;
+
+    fseek(bin2, 17, SEEK_SET);
+    while (fread(&removido, sizeof(char), 1, bin2) == 1)
+    {  
+        // Ignora os registros removidos
+        if (removido == '1')
+        {
+            RRN2++;
+            posRecord2 = 17 + RRN2 * 80;
+            fseek(bin2, posRecord2, SEEK_SET);
+            continue;
+        }
+
+        // Adiciona o registro na lista em memoria RAM
+        posRecord2 = 17 + RRN2 * 80;
+        fseek(bin2, posRecord2, SEEK_SET);
+        record = record_read_from_file(bin2);
+        record_list2[quant_record2] = record;
+        quant_record2++;
+
+        if(quant_record2 > quant_register2){
+            record_list2 = realloc(record_list2, (quant_register2 * 2) * sizeof(Record *));
+            quant_register2 *= 2;
+        }
+
+        RRN2++;
+        posRecord2 = 17 + RRN2 * 80;
+        fseek(bin2, posRecord2, SEEK_SET);
+    }
+
+    // Ordena ambos os vetores usando o Merge Sort
+    mergeSort(record_list, 0, quant_record - 1, joinCampo1);
+    mergeSort(record_list2, 0, quant_record2 - 1, joinCampo2);
+
+    // Sort-Merge Join
+    bool encontrou_algum = false;
+    int i = 0, j = 0;
+
+    while (i < quant_record && j < quant_record2) {
+        // Captura as chaves dependendo do campo de ordenacao definido para cada arquivo
+        int v1 = (strcmp(joinCampo1, "codEstacao") == 0) ? record_get_codEstacao(record_list[i]) : record_get_codProxEstacao(record_list[i]);
+        int v2 = (strcmp(joinCampo2, "codEstacao") == 0) ? record_get_codEstacao(record_list2[j]) : record_get_codProxEstacao(record_list2[j]);
+
+        // Ignora valores nulos
+        if (v1 == -1) { i++; continue; }
+        if (v2 == -1) { j++; continue; }
+
+        if (v1 < v2)
+            i++;
+        else if (v1 > v2)
+            j++;
+        else {
+            // Se v1 == v2, varremos todos os elementos correspondentes na record_list2
+            int match_j = j;
+            while (match_j < quant_record2) {
+                int v2_next = (strcmp(joinCampo2, "codEstacao") == 0) ? record_get_codEstacao(record_list2[match_j]) : record_get_codProxEstacao(record_list2[match_j]);
+                if (v2_next != v1) break;
+
+                if (strcmp(joinCampo1, "codProxEstacao") == 0) {
+                    print_join(record_list[i], record_list2[match_j]);
+                } 
+                else {
+                    print_join(record_list2[match_j], record_list[i]);
+                }
+                encontrou_algum = true;
+                match_j++;
+            }
+            i++; // Avança na lista principal após processar o bloco de correspondências
+        }
+    }
+
+    if (!encontrou_algum) {
+        printf("Registro inexistente.\n");
+    }
+
+    // Free da memoria
+    for (int idx = 0; idx < quant_record; idx++) {
+        free_record(&record_list[idx]);
+    }
+    free(record_list);
+
+    for (int idx = 0; idx < quant_record2; idx++) {
+        free_record(&record_list2[idx]);
+    }
+    free(record_list2);
+
+    free_header_register(&header);
+    free_header_register(&header2);
 
     fclose(bin1);
     fclose(bin2);
@@ -1115,20 +1241,6 @@ void remove_register_with_btree(Record *r, int posRecord, Contexto *ctx){
     free_search_result(&result);
 }
 
-Record *comparar_record_codEstacao(Record *a, Record *b){
-    if (record_get_codEstacao(a) == 0 && record_get_codEstacao(b) == 0) return a;
-    if (record_get_codEstacao(a) == 0) return b;
-    if (record_get_codEstacao(b) == 0) return a;
-    return (record_get_codEstacao(a) <= record_get_codEstacao(b)) ? a : b;
-}
-
-Record *comparar_record_codProxEstacao(Record *a, Record *b){
-    if (record_get_codProxEstacao(a) == 0 && record_get_codProxEstacao(b) == 0) return a;
-    if (record_get_codProxEstacao(a) == 0) return b;
-    if (record_get_codProxEstacao(b) == 0) return a;
-    return (record_get_codProxEstacao(a) <= record_get_codProxEstacao(b)) ? a : b;
-}
-
 // Funcao auxiliar para imprimir o resultado da junção
 void print_join(Record *r1, Record *r2) {
     // codEstacao (de r1)
@@ -1153,4 +1265,77 @@ void print_join(Record *r1, Record *r2) {
     char *nome2 = record_get_nomeEstacao(r2);
     if (nome2 == NULL || strlen(nome2) == 0) printf("NULO\n");
     else printf("%s\n", nome2);
+}
+
+void merge_sort_auxiliar(Record **vetor, int esquerda, int meio, int direita, char *campoOrdenacao) {
+    int i, j, k;
+    int n1 = meio - esquerda + 1;
+    int n2 = direita - meio;
+
+    Record **vetorEsquerda = malloc(n1 * sizeof(Record*));
+    Record **vetorDireita = malloc(n2 * sizeof(Record*));
+
+    for (i = 0; i < n1; i++)
+        vetorEsquerda[i] = vetor[esquerda + i];
+    for (j = 0; j < n2; j++)
+        vetorDireita[j] = vetor[meio + 1 + j];
+
+    i = 0;
+    j = 0;
+    k = esquerda;
+    
+    if (strncmp(campoOrdenacao, "codEstacao", 10) == 0) {
+        while (i < n1 && j < n2) {
+            if (record_get_codEstacao(vetorEsquerda[i]) <= record_get_codEstacao(vetorDireita[j])) {
+                vetor[k] = vetorEsquerda[i];
+                i++;
+            } 
+            else {
+                vetor[k] = vetorDireita[j];
+                j++;
+            }
+            k++;
+        }
+    } 
+    else if (strncmp(campoOrdenacao, "codProxEstacao", 14) == 0) {
+        while (i < n1 && j < n2) {
+            if (record_get_codProxEstacao(vetorEsquerda[i]) <= record_get_codProxEstacao(vetorDireita[j])) {
+                vetor[k] = vetorEsquerda[i];
+                i++;
+            } 
+            else {
+                vetor[k] = vetorDireita[j];
+                j++;
+            }
+            k++;
+        }
+    } 
+
+    while (i < n1) {
+        vetor[k] = vetorEsquerda[i];
+        i++;
+        k++;
+    }
+
+    while (j < n2) {
+        vetor[k] = vetorDireita[j];
+        j++;
+        k++;
+    }
+
+    free(vetorEsquerda);
+    free(vetorDireita);
+}
+
+// Função principal do Merge Sort
+void mergeSort(Record **vetor, int esquerda, int direita, char *campoOrdenacao) {
+    if (esquerda < direita) {
+        int meio = esquerda + (direita - esquerda) / 2;
+
+        // Ordena a primeira e a segunda metade
+        mergeSort(vetor, esquerda, meio, campoOrdenacao);
+        mergeSort(vetor, meio + 1, direita, campoOrdenacao);
+
+        merge_sort_auxiliar(vetor, esquerda, meio, direita, campoOrdenacao);
+    }
 }

@@ -121,6 +121,7 @@ int main(void){
         if(create_order_by(arq_bin, campoOrdenacao, arq_order)){
             BinarioNaTela(arq_order);
         }
+        break;
     }
     case 14:{
         // funcionalidade 14
@@ -130,6 +131,7 @@ int main(void){
         scanf("%s ", arq_bin2);
         ScanQuoteString(joinCampo2);
         join_order_by(arq_bin1, joinCampo1, arq_bin2, joinCampo2);
+        break;
     }
     }   
     return 0;
